@@ -19,27 +19,33 @@ class EmptyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            if (icon != null)
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8),
-                child: IconTheme.merge(
-                  data: const IconThemeData(size: 40, opticalSize: 80),
-                  child: icon!,
+      // Shrink-wrap before centering so intrinsic/unbounded sliver hosts need
+      // neither a LayoutBuilder nor an unbounded nested viewport.
+      child: SingleChildScrollView(
+        primary: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              if (icon != null)
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8),
+                  child: IconTheme.merge(
+                    data: const IconThemeData(size: 40, opticalSize: 80),
+                    child: icon!,
+                  ),
                 ),
-              ),
-            if (text != null)
-              DefaultTextStyle(
-                style: Theme.of(context).textTheme.bodyLarge!,
-                textAlign: TextAlign.center,
-                child: text!,
-              ),
-            ?action,
-          ],
+              if (text != null)
+                DefaultTextStyle(
+                  style: Theme.of(context).textTheme.bodyLarge!,
+                  textAlign: TextAlign.center,
+                  child: text!,
+                ),
+              ?action,
+            ],
+          ),
         ),
       ),
     );

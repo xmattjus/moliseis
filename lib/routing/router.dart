@@ -33,7 +33,6 @@ import 'package:moliseis/ui/explore/view_models/suggestion_view_model.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/favourite/view_models/favourite_view_model.dart';
 import 'package:moliseis/ui/favourite/widgets/favourite_screen.dart';
-import 'package:moliseis/ui/gallery/models/gallery_preview_route_data.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/ui/geo_map/view_models/geo_map_view_model.dart';
 import 'package:moliseis/ui/geo_map/widgets/geo_map_screen.dart';
@@ -92,7 +91,19 @@ GoRouter buildAppRouter({
       syncViewModel.sync.isRunning,
       adminAuthViewModel,
     ]),
-    onEnter: adminExit.onEnter,
+    onEnter: (context, current, next, router) {
+      final decision = adminExit.onEnter(context, current, next, router);
+      if (next.matchedLocation != RoutePaths.gallery) return decision;
+
+      OnEnterResult observe(OnEnterResult result) {
+        if (result is Block) GalleryPreviewScreen.refuseOpening(next.extra);
+        return result;
+      }
+
+      return decision is OnEnterResult
+          ? observe(decision)
+          : decision.then(observe);
+    },
     redirect: (context, state) =>
         _redirectForSync(context, syncViewModel, state) ??
         _redirectForAdminAuth(adminAuthViewModel, state),
@@ -329,12 +340,7 @@ GoRouter buildAppRouter({
       GoRoute(
         path: RoutePaths.gallery,
         name: RouteNames.gallery,
-        builder: (_, state) {
-          final data = GalleryPreviewRouteData.tryParse(state.extra);
-          return data == null
-              ? const GalleryUnavailableScreen()
-              : GalleryPreviewScreen(data: data);
-        },
+        pageBuilder: GalleryPreviewScreen.buildPage,
       ),
       StatefulShellRoute.indexedStack(
         restorationScopeId: 'appShell',

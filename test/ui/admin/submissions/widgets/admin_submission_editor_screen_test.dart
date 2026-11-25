@@ -1039,8 +1039,8 @@ void main() {
       final renderedAsset = tester.widget<AppNetworkImage>(
         find.byType(AppNetworkImage),
       );
-      expect(renderedAsset.imageWidth, asset.width);
-      expect(renderedAsset.imageHeight, asset.height);
+      expect(renderedAsset.url, asset.url);
+      expect(renderedAsset.fit, BoxFit.cover);
       expect(
         find.byKey(const ValueKey<String>('admin_submission_asset_2')),
         findsOneWidget,

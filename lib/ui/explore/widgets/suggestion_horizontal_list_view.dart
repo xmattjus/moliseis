@@ -172,8 +172,6 @@ class _CarouselViewItem extends StatelessWidget {
                 url: content.media.first.url,
                 width: _itemWidth,
                 height: height,
-                imageWidth: content.media.first.width,
-                imageHeight: content.media.first.height,
               ),
             ),
           Positioned.fill(

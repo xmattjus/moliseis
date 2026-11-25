@@ -1,5 +1,8 @@
 import 'dart:async';
 
+import 'package:cached_network_image_ce/cached_network_image.dart'
+    show CacheManager;
+
 import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/media.dart';
@@ -7,8 +10,10 @@ import 'package:moliseis/ui/core/ui/app_page_indicator.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
 import 'package:moliseis/ui/core/ui/empty_box.dart';
 import 'package:moliseis/ui/core/ui/media/app_network_image.dart';
+import 'package:moliseis/ui/core/ui/media/image_size_bucket.dart';
 import 'package:moliseis/ui/gallery/widgets/gallery_preview_screen.dart';
 import 'package:moliseis/utils/extensions/extensions.dart';
+import 'package:provider/provider.dart';
 
 part '_post_media_slideshow_pause_button.dart';
 
@@ -33,102 +38,142 @@ class PostMediaSlideshow extends StatefulWidget {
 class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     with TickerProviderStateMixin {
   static const _innerChromeOffset = 16.0;
-
-  late final AnimationController _animationController;
-
-  Duration _delta = Duration.zero;
-
-  bool get _isSlideshowVisible => widget.visibilityNotifier.value;
-
-  final _autoPlayEnabledNotifier = ValueNotifier<bool>(true);
-  bool get _isAutoPlayEnabled => _autoPlayEnabledNotifier.value;
-
-  final _isMediaLoadingNotifier = ValueNotifier<bool>(true);
-  bool get _isMediaLoading => _isMediaLoadingNotifier.value;
-
-  /// The duration required to automatically change slide.
   static const _durationToNextSlide = Duration(seconds: 5);
 
-  Duration _elapsedTime = Duration.zero;
+  late final Ticker _ticker;
+  final PageController _pageController = PageController();
+  final _autoPlayEnabledNotifier = ValueNotifier<bool>(true);
+  List<_MediaPageOwner> _owners = [];
+  Object _listRevision = Object();
+  int _activeIndex = 0;
+  bool _userDisabledScroll = false;
+  GalleryPresentation? _galleryPresentation;
+  bool _publicationQueued = false;
   Duration _lastElapsed = Duration.zero;
 
-  /// Creates a page controller showing the content media.
-  final PageController _pageController = PageController();
-
-  late Ticker _ticker;
-
-  /// Whether [_ticker] must be initialized or not.
-  bool get _initTicker => widget.media.length > 1;
-
-  int _lastPage = 0;
-
-  /// Whether the user has manually disabled the slideshow autoplay by
-  /// scrolling or not.
-  bool _userDisabledScroll = false;
+  bool get _hasMultipleMedia => _owners.length > 1;
+  bool get _isSlideshowVisible => widget.visibilityNotifier.value;
+  bool get _isAutoPlayEnabled => _autoPlayEnabledNotifier.value;
+  bool get _isMediaLoading => _owners.isEmpty || !_owners[_activeIndex].isReady;
 
   @override
   void initState() {
     super.initState();
-
-    if (_initTicker) {
-      // The ticker will be started when the first image has been loaded.
-      _ticker = createTicker(_onTick);
-    }
-
-    _animationController = AnimationController(
-      duration: _durationToNextSlide,
-      vsync: this,
-    );
+    _ticker = createTicker(_onTick);
+    widget.visibilityNotifier.addListener(_onVisibilityChanged);
+    _reconcileOwners();
   }
 
   @override
   void didUpdateWidget(covariant PostMediaSlideshow oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.visibilityNotifier != widget.visibilityNotifier) {
+      oldWidget.visibilityNotifier.removeListener(_onVisibilityChanged);
+      widget.visibilityNotifier.addListener(_onVisibilityChanged);
+      // Reconcile after build, when request invalidation has been applied.
+      _queuePublication();
+    }
+    // Owner and request changes queue their own deferred publication.
+    _reconcileOwners();
+  }
 
-    // If the user has manually disabled the slideshow autoplay, we don't want
-    // to re-enable it when the widget updates.
-    if (_userDisabledScroll) return;
-
-    _syncAutoPlayWithVisibility();
+  void _reconcileOwners() {
+    final identities = [
+      for (final media in widget.media) (media.remoteId, media.url),
+    ];
+    var changed = identities.length != _owners.length;
+    final next = <_MediaPageOwner>[];
+    for (var i = 0; i < identities.length; i++) {
+      if (i < _owners.length && _owners[i].identity == identities[i]) {
+        next.add(_owners[i]);
+      } else {
+        changed = true;
+        next.add(_MediaPageOwner(identities[i]));
+      }
+    }
+    for (final owner in _owners) {
+      if (!next.contains(owner)) owner.revoke();
+    }
+    _owners = next;
+    if (!changed) return;
+    _listRevision = Object();
+    _activeIndex = _owners.isEmpty
+        ? 0
+        : _activeIndex.clamp(0, _owners.length - 1);
+    _stopAutoPlay();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_pageController.hasClients && _owners.isNotEmpty) {
+        _pageController.jumpToPage(_activeIndex);
+      }
+      _queuePublication();
+    });
   }
 
   @override
   void dispose() {
-    if (_initTicker) _ticker.dispose();
+    widget.visibilityNotifier.removeListener(_onVisibilityChanged);
+    for (final owner in _owners) {
+      owner.revoke();
+    }
+    _galleryPresentation?.detach();
+    _ticker.dispose();
     _pageController.dispose();
-    _isMediaLoadingNotifier.dispose();
     _autoPlayEnabledNotifier.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
-  void _syncAutoPlayWithVisibility() {
-    _autoPlayEnabledNotifier.value = _isSlideshowVisible;
-    _isSlideshowVisible ? _startAutoPlay() : _stopAutoPlay();
+  void _onVisibilityChanged() {
+    if (!mounted) return;
+    _reconcileAutoPlay();
   }
 
   void _onTick(Duration elapsed) {
-    if (elapsed - _lastElapsed > const Duration(milliseconds: 500)) {
-      _delta = Duration.zero;
+    if (!mounted) return;
+    if (!_canAutoPlay) {
+      _stopAutoPlay();
+      return;
     }
-
-    _elapsedTime = elapsed - _delta;
-
-    if (_elapsedTime > _durationToNextSlide) {
-      _animateToNextSlideLooped();
-
-      _delta = elapsed;
+    if (elapsed - _lastElapsed > _durationToNextSlide) {
+      _lastElapsed = elapsed;
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          (_activeIndex + 1) % _owners.length,
+          duration: Durations.extralong4,
+          curve: Curves.easeInOutCubicEmphasized,
+        );
+      }
     }
+  }
 
-    _lastElapsed = elapsed;
+  bool get _canAutoPlay =>
+      mounted &&
+      _hasMultipleMedia &&
+      _isSlideshowVisible &&
+      _isAutoPlayEnabled &&
+      _galleryPresentation == null &&
+      !_isMediaLoading;
+
+  void _reconcileAutoPlay() {
+    if (_canAutoPlay) {
+      if (!_ticker.isActive) {
+        _lastElapsed = Duration.zero;
+        _ticker.start();
+      }
+    } else {
+      _stopAutoPlay();
+    }
+  }
+
+  void _stopAutoPlay() {
+    if (_ticker.isActive) _ticker.stop();
   }
 
   void _toggleAutoScroll() {
-    _autoPlayEnabledNotifier.value = !_autoPlayEnabledNotifier.value;
-
+    if (!mounted) return;
     _userDisabledScroll = !_userDisabledScroll;
-
-    !_isAutoPlayEnabled ? _stopAutoPlay() : _startAutoPlay();
+    _autoPlayEnabledNotifier.value = !_userDisabledScroll;
+    _reconcileAutoPlay();
   }
 
   void _disableAutoPlayByUserScroll() {
@@ -137,70 +182,84 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     _stopAutoPlay();
   }
 
-  Future<void> _openGalleryPreview(int initialIndex) async {
-    if (_isAutoPlayEnabled) {
-      _stopAutoPlay();
-    }
-
+  Future<void> _openGalleryPreview(_MediaPageOwner owner) async {
+    if (!mounted) return;
+    if (_galleryPresentation != null || !owner.valid) return;
+    final initialIndex = _owners.indexOf(owner);
+    if (initialIndex < 0) return;
+    late final GalleryPresentation presentation;
+    presentation = GalleryPresentation(() {
+      if (!mounted || !identical(_galleryPresentation, presentation)) return;
+      _galleryPresentation = null;
+      _reconcileAutoPlay();
+    });
+    _galleryPresentation = presentation;
+    _stopAutoPlay();
     await GalleryPreviewScreen.show(
       context: context,
       media: widget.media,
       initialIndex: initialIndex,
+      presentation: presentation,
     );
-
-    if (!mounted) return;
-
-    if (_isAutoPlayEnabled) {
-      _startAutoPlay();
-    }
   }
 
-  void _onImageLoadingChanged(bool isLoading) {
+  void _queuePublication() {
+    if (!mounted) return;
+    // Child build/disposal can publish; defer UI notification, then read the
+    // latest active owner instead of retaining a page's obsolete loading bool.
+    if (_publicationQueued) return;
+    _publicationQueued = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _isMediaLoadingNotifier.value = isLoading;
+      _publicationQueued = false;
+      setState(() {});
+      _reconcileAutoPlay();
     });
-
-    if (_isAutoPlayEnabled) {
-      isLoading ? _stopAutoPlay() : _startAutoPlay();
-    }
+    SchedulerBinding.instance.ensureVisualUpdate();
   }
 
-  Widget _buildMediaPager(BoxConstraints constraints) => SizedBox(
-    width: constraints.maxWidth,
-    height: widget.height,
-    child: NotificationListener(
-      onNotification: (notification) {
-        if (notification is UserScrollNotification) {
-          _disableAutoPlayByUserScroll();
-        }
-        return true;
-      },
-      child: PageView.builder(
-        controller: _pageController,
-        onPageChanged: (_) {
-          if (_isAutoPlayEnabled) {
-            _animationController.forward(from: 0);
+  Widget _buildMediaPager(BoxConstraints constraints, Object request) {
+    final revision = _listRevision;
+    return SizedBox(
+      width: constraints.maxWidth,
+      height: widget.height,
+      child: NotificationListener(
+        onNotification: (notification) {
+          if (!mounted) return true;
+          if (notification is UserScrollNotification) {
+            _disableAutoPlayByUserScroll();
           }
+          return true;
         },
-        itemBuilder: (_, index) {
-          return CardBase(
-            shape: const RoundedRectangleBorder(),
-            onPressed: () => _openGalleryPreview(index),
-            child: AppNetworkImage(
-              url: widget.media[index].url,
+        child: PageView.builder(
+          controller: _pageController,
+          onPageChanged: (index) {
+            if (!mounted) return;
+            if (!identical(revision, _listRevision) ||
+                index >= _owners.length) {
+              return;
+            }
+            _activeIndex = index;
+            _stopAutoPlay();
+            _queuePublication();
+          },
+          itemBuilder: (_, index) {
+            final owner = _owners[index];
+            return _SlideshowImagePage(
+              key: ObjectKey(owner),
+              owner: owner,
+              request: request,
               width: constraints.maxWidth,
               height: widget.height,
-              imageWidth: widget.media[index].width,
-              imageHeight: widget.media[index].height,
-              onImageLoading: _onImageLoadingChanged,
-            ),
-          );
-        },
-        itemCount: widget.media.length,
+              onChanged: _queuePublication,
+              onPressed: () => _openGalleryPreview(owner),
+            );
+          },
+          itemCount: _owners.length,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _buildPageIndicator(int itemCount) => Positioned(
     left: 0,
@@ -221,7 +280,6 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
       animation: Listenable.merge([
         widget.visibilityNotifier,
         _autoPlayEnabledNotifier,
-        _isMediaLoadingNotifier,
       ]),
       builder: (_, _) {
         return _PostMediaSlideshowPauseButton(
@@ -235,53 +293,136 @@ class _PostMediaSlideshowState extends State<PostMediaSlideshow>
     ),
   );
 
-  void _startAutoPlay() {
-    // Starts the slideshow autoplay only if there is more than 1 media to show
-    // and the ticker is not already active.
-    if (_initTicker && !_ticker.isActive) {
-      _delta = Duration.zero;
-      _ticker.start();
-      _animationController.forward();
-    }
-  }
-
-  void _stopAutoPlay() {
-    if (_initTicker && _ticker.isActive) {
-      _ticker.stop();
-      _animationController.reset();
-    }
-  }
-
-  void _animateToNextSlideLooped() {
-    if (_pageController.hasClients) {
-      final currentPage = _pageController.page?.toInt() ?? _lastPage;
-
-      final nextPage = currentPage < widget.media.length - 1
-          ? currentPage + 1
-          : 0;
-
-      _pageController.animateToPage(
-        nextPage,
-        duration: Durations.extralong4,
-        curve: Curves.easeInOutCubicEmphasized,
-      );
-
-      _lastPage = nextPage;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final request = (
+          ImageSizeBucket.resolveAndClamp(
+            logicalWidth: constraints.maxWidth,
+            logicalHeight: widget.height,
+            devicePixelRatio: MediaQuery.maybeDevicePixelRatioOf(context) ?? 2,
+          ),
+          context.read<CacheManager>(),
+        );
+        var requestChanged = false;
+        for (final owner in _owners) {
+          if (owner.request != request) {
+            requestChanged = true;
+            owner
+              ..request = request
+              ..child = null
+              ..loading = true;
+          }
+        }
+        if (requestChanged) _queuePublication();
         return Stack(
           children: <Widget>[
-            _buildMediaPager(constraints),
-            if (_initTicker) _buildPageIndicator(widget.media.length),
-            if (_initTicker) _buildPauseButtonOverlay(),
+            _buildMediaPager(constraints, request),
+            if (_hasMultipleMedia) _buildPageIndicator(_owners.length),
+            if (_hasMultipleMedia) _buildPauseButtonOverlay(),
           ],
         );
       },
     );
   }
+}
+
+/// Slot identity survives rebuilds; readiness belongs only to its live child.
+class _MediaPageOwner {
+  _MediaPageOwner(this.identity);
+
+  final (int, String) identity;
+  bool valid = true;
+  bool loading = true;
+  Object? child;
+  Object? request;
+
+  bool get isReady => valid && child != null && !loading;
+
+  void revoke() {
+    valid = false;
+    child = null;
+    loading = true;
+  }
+}
+
+class _SlideshowImagePage extends StatefulWidget {
+  const _SlideshowImagePage({
+    required this.owner,
+    required this.request,
+    required this.width,
+    required this.height,
+    required this.onChanged,
+    required this.onPressed,
+    super.key,
+  });
+
+  final _MediaPageOwner owner;
+  final Object request;
+  final double width;
+  final double height;
+  final VoidCallback onChanged;
+  final VoidCallback onPressed;
+
+  @override
+  State<_SlideshowImagePage> createState() => _SlideshowImagePageState();
+}
+
+class _SlideshowImagePageState extends State<_SlideshowImagePage> {
+  Object _lease = Object();
+  late ValueChanged<bool> _onImageLoading;
+
+  void _bindRequest() {
+    final owner = widget.owner;
+    final request = widget.request;
+    final lease = _lease = Object();
+    owner
+      ..child = lease
+      ..loading = true;
+    _onImageLoading = (loading) {
+      if (!mounted) return;
+      if (!owner.valid ||
+          !identical(owner.child, lease) ||
+          owner.request != request) {
+        return;
+      }
+      owner.loading = loading;
+      widget.onChanged();
+    };
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _bindRequest();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SlideshowImagePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.request != widget.request) _bindRequest();
+  }
+
+  @override
+  void dispose() {
+    if (identical(widget.owner.child, _lease)) {
+      widget.owner.child = null;
+      widget.owner.loading = true;
+      widget.onChanged();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => CardBase(
+    shape: const RoundedRectangleBorder(),
+    onPressed: widget.onPressed,
+    child: AppNetworkImage(
+      url: widget.owner.identity.$2,
+      width: widget.width,
+      height: widget.height,
+      onImageLoading: _onImageLoading,
+    ),
+  );
 }

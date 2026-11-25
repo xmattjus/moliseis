@@ -4,7 +4,7 @@
 
 Provide proportional local and remote image presentation with stable cache behavior, accessible failure feedback and verifiable rendering costs while preserving staging and gallery contracts.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Bounded cover decoding preserves proportions with an explicit output ceiling
 
@@ -294,14 +294,44 @@ PostMediaSlideshow SHALL retain readiness only for valid page owners and their e
 - **AND** manual pause/user-scroll intent and existing gallery pause/return behavior remain respected
 - **AND** visibility listeners are rebound/released and the ticker is initialized/disposed by State lifetime, without late callbacks touching disposed resources
 
-#### Scenario: Gallery future owns an autoplay pause
+### Requirement: Gallery presentation owns the slideshow pause
 
-- **GIVEN** scroll visibility remains true while the existing gallery route Future is pending
-- **WHEN** the current image completes or the parent rebuilds during that pause
-- **THEN** the slideshow ticker remains stopped independently of image readiness and scroll visibility
-- **AND** repeated opens do not create competing owners for the local suspension
-- **AND** return releases suspension and rechecks current owner/readiness, visibility and user intent; obsolete or disposed state cannot restart autoplay
-- **AND** route failures retain their existing exception propagation while releasing the local pause safely
+A slideshow SHALL admit at most one Gallery opening or presentation at a time. An established presentation SHALL retain ownership through temporary coverage and equivalent route refresh. Actual termination of that presentation SHALL release its reservation independently of the imperative navigation result. Autoplay SHALL resume only under the current slideshow admission conditions.
+
+#### Scenario: Gallery is open or temporarily covered
+
+- **WHEN** the image settles, the parent rebuilds, or another route temporarily covers the owned Gallery
+- **THEN** the slideshow keeps its ticker stopped and rejects a competing opening
+
+#### Scenario: Back removes Gallery while the original result remains pending
+
+- **GIVEN** a router refresh replaces the result completer while retaining the Gallery Page
+- **WHEN** Gallery actually ends and the same Post is revealed
+- **THEN** the slideshow can reopen Gallery despite the unresolved original result
+- **AND** autoplay rechecks the mounted owner, multiple media, latest readiness, visibility and user intent
+
+#### Scenario: An obsolete result completes before the Gallery Page is removed
+
+- **WHEN** a stale pop completes the old result while the same Gallery Page remains admitted, including recreation of its Flutter Route
+- **THEN** the existing reservation prevents another opening and keeps autoplay suspended until actual termination
+
+#### Scenario: An opening fails, is refused or is superseded before presenting
+
+- **WHEN** the selected request throws a navigation error or is prevented from establishing a Gallery
+- **THEN** its pending reservation is released and the slideshow can try again
+- **AND** navigation exceptions continue to propagate through the original call contract
+
+#### Scenario: The admitted opening has not yet created a Route
+
+- **WHEN** another navigation request arrives after the Gallery match commits and before its physical Route is created
+- **THEN** the reservation remains exclusive while the committed Gallery match is still admitted, including under a covering push
+- **AND** if a subsequent commit omits Gallery, it releases the reservation even if the original push result remains pending
+
+#### Scenario: The originating slideshow is disposed or replaced
+
+- **WHEN** a retired opening reports a late result or a retired Gallery Route terminates
+- **THEN** it cannot affect a new reservation or restart a disposed slideshow
+- **AND** Gallery restoration continues to use its serialized media and page state
 
 ### Requirement: Local and remote image failures provide accessible empty states
 
