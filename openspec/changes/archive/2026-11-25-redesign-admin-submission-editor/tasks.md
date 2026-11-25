@@ -42,3 +42,11 @@ Implementation was explicitly authorized after review of planning commit `bb635b
 - [x] 6.4 Capture explicitly selected current candidate identity independently of invalidated results, with honest manual-ID fallback. Verify query retention, target/manual/owner/activation retirement, obsolete responses, long identity and exact Link target.
 - [x] 6.5 Extract cohesive feature-local identity/metadata, media, decision, verification and merge widgets. Verify stable Form/controller ownership, recovery/lifecycle/routing/media/privacy regressions, primary-controller isolation and complete secondary targets.
 - [x] 6.6 Verify 320x500 with 100/300 keyboard, 0/24/59 top insets and 100/200% text, keyboard transitions and invalid Save reveal. Verify staged Future retention/replacement/retry and DPR decode hints. Run formatting, full analyzer, targeted regressions, complete autonomous suite, strict OpenSpec and diff checks; inspect rendered compact/expanded flows, adversarial final diff and latest pushed CI. Retain only intentional source/tests/change artifacts and keep the existing PR Draft.
+
+## Archived acceptance record
+
+[PR #42](https://github.com/xmattjus/moliseis/pull/42) merged the workspace
+and its remediation. The recorded acceptance covers Flutter-rendered layouts
+and application-level Replay masking. Real-device keyboard and screen-reader
+behavior, native Replay pixel output, representative-user validation and measured
+memory savings remain unverified.

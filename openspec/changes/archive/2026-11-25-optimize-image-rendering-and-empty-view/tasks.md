@@ -48,14 +48,14 @@ Dependency: tasks 2.1 and 3.3 consume the image-error composition in 4.2; implem
 - [x] 6.1 Reproduce both result interleavings against the unchanged production baseline using the real app router and bounded widget-test observations. Verify retained Post/slideshow identity and the failed hit-tested reopen and autoplay after ordinary Back. Label the competing callback invocation in the early-result case as synthetic.
 - [x] 6.2 Bind each local opening to the actual Gallery presentation. Follow the exact Page through retained or recreated Routes, observe explicit blocks and committed supersession while opening, preserve error propagation, and revoke obsolete slideshow authority.
 - [x] 6.3 Cover the corrected behavior permanently in `test/routing/post_gallery_lifecycle_test.dart` and the slideshow lifecycle suite. Exercise coverage, duplicate admission, readiness, visibility, pause, media count, errors, restoration, Sync, and replacement through visible outcomes and actual route/widget identity.
-- [x] 6.4 Record focused and autonomous verification plus diagnostic identity comparison in [the implementation evidence](../../../docs/performance/image-rendering-implementation.md#gallery-presentation-lifecycle--2026-11-25). Preserve the iOS release gates and leave the change active.
-- [x] 6.5 Simplify redirect and Page reconciliation handling after adversarial review. Verify a Sync-redirected push over a retained Post, both committed-but-unbuilt opening boundaries, repeated same-key Route recreation and reduced-motion Back. Keep the explicit block notification and document how the production guard and synthetic request are exercised. Record the targeted mutation results in [the implementation evidence](../../../docs/performance/image-rendering-implementation.md#final-gallery-review-remediation).
+- [x] 6.4 Record focused and autonomous verification plus diagnostic identity comparison in [the implementation evidence](../../../../docs/performance/image-rendering-implementation.md#gallery-presentation-lifecycle-2026-11-25). Preserve the iOS release gates and leave the change active.
+- [x] 6.5 Simplify redirect and Page reconciliation handling after adversarial review. Verify a Sync-redirected push over a retained Post, both committed-but-unbuilt opening boundaries, repeated same-key Route recreation and reduced-motion Back. Keep the explicit block notification and document how the production guard and synthetic request are exercised. Record the targeted mutation results in [the implementation evidence](../../../../docs/performance/image-rendering-implementation.md#final-gallery-review-remediation).
 
 ## Implementation handoff (2026-11-15)
 
 Implementation is authorized by the current user request. Deterministic evidence
 and remaining gates are recorded in
-[`image-rendering-implementation.md`](../../../docs/performance/image-rendering-implementation.md).
+[`image-rendering-implementation.md`](../../../../docs/performance/image-rendering-implementation.md).
 
 - Independent code review found and rechecked the gallery contrast correction;
   no further material finding remained in the reviewed production diff.
@@ -77,7 +77,7 @@ evidence recorded in the implementation document.
   both "Flutter analyze" and "Autonomous Flutter tests" passed. This verifies
   the CI gate, not physical-device performance or assistive-technology behavior.
 - 5.3 physical Android Profile acceptance is recorded in
-  [the implementation evidence](../../../docs/performance/image-rendering-implementation.md#physical-android-profile-acceptance--2026-11-24).
+  [the implementation evidence](../../../../docs/performance/image-rendering-implementation.md#physical-android-profile-acceptance--2026-11-24).
   Physical iOS memory-pressure, scrolling and raster remain NOT VERIFIED
   under the documented deferral. Tested and untested codec/backend
   configurations are listed separately.
@@ -87,4 +87,4 @@ evidence recorded in the implementation document.
   speech and enlarged Nearby Retry reachability and reverse navigation
   using active VoiceOver scrolling. Genuine Retry activation and physical
   iOS performance remain NOT VERIFIED in the
-  [iOS release checklist](../../../docs/performance/image-rendering-implementation.md#ios-release-gates).
+  [iOS release checklist](../../../../docs/performance/image-rendering-implementation.md#ios-release-gates).
