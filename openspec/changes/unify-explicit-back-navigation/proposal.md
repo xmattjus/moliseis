@@ -32,3 +32,11 @@ None.
 The change covers Settings, Login, ordinary Category, Post, Search Results,
 route errors, Gallery, Gallery Unavailable and Dashboard's terminal Back.
 Existing Admin routing and admission remain in place.
+
+## Outside this change
+
+The existing protected departure policies remain in force. Ordinary explicit
+Back qualifies its source before dispatch. Atomic completion of deferred
+exits is tracked in [Harden deferred route exits](../harden-deferred-route-exits/proposal.md).
+Admin history after authorization changes is tracked separately in
+[Investigate and harden Admin navigation authorization](../harden-admin-navigation-authorization/proposal.md).

@@ -9,7 +9,7 @@ versions are Flutter 3.47.5 (`6a19cca564`), Dart 3.13.4, GoRouter 18.0.2,
 material_ui 1.5.0 and OpenSpec 2.1.0. The qualification below relies on
 behavior verified against those versions.
 
-The real app's standalone Login Back calls direct Navigator pop. A tap on
+Before this change, standalone Login Back called direct Navigator pop. A tap on
 the visible control reproduced the last-page assertion and left the
 committed configuration empty, both on direct entry and after a
 Dashboard sign-out event through the production redirect. The second
@@ -80,8 +80,7 @@ reference that the Route uses the owning Navigator's top installed Page.
 A local Navigator push can carry Page settings with the expected key
 without an association in the router. Qualify the associated state's key
 and destination to reject a missing or unrelated ancestor association.
-The pinned fixed router
-also exposes an inexpensive discriminator without a new association.
+GoRouter 18.0.2 also exposes an identity check through this association.
 `ImperativeRouteMatch.buildState` passes its inner path-parameter map
 through directly, and decoding a replacement result matches the location
 into a fresh map, even for a parameterless path. Compare that installed
@@ -122,26 +121,23 @@ independent of navigation ownership.
 
 ## Feature boundaries
 
-- **Admin.** Keep the current route topology, ID validation, diagnostic,
-  authorization, admission, recovery and editor exit policy. Give the
-  existing malformed diagnostic a feature-owned predecessor-only action
-  shared by its two controls. Use the existing protected pop path and
-  preserve deferred `onExit`. It can evaluate removal of the diagnostic
-  within its own route, without authorizing removal of a retained editor.
-  A realistic producer of malformed imperative entries justifying a
-  wider change was not established. Typed inputs alone do not prove
-  positivity. Overlapping explicit and system Back can reach deferred
-  `onExit` on the same installed diagnostic and complete its push result
-  twice. A newer cover can also commit while the diagnostic is still
-  installed. The malformed imperative diagnostic checks the match's
-  path-parameter map identity and refuses a pop against an unreconciled
-  cover. For an allowed decision it rechecks the committed configuration
-  and delivers the verdict synchronously to the awaiting delegate, so a
-  second decision sees the completed departure. A rejected request leaves
-  a reconciled diagnostic eligible for a new attempt. The existing
-  dirty-editor policy still evaluates editor departures and full-stack
-  replacement. Legacy restoration remains an
-  upstream limitation.
+- **Admin.** Keep route topology, ID validation, admission and the existing
+  editor exit policy (`onExit: adminExit.exit`). Both diagnostic controls
+  qualify the installed source and request a predecessor-only pop. A single
+  admitted departure preserves the underlying editor, including a dirty draft.
+  Covered, obsolete and otherwise ineligible explicit sources make no request.
+  This qualification is performed at activation. Completion through the
+  existing asynchronous exit policy remains subject to GoRouter 18.0.2.
+  The removed workaround tried to discriminate stale physical pops in
+  `onExit`. That callback also serves declarative replacement and receives the
+  same diagnostic state and Navigator context in both cases. With a committed
+  but uninstalled Settings cover, the workaround rejected a legitimate
+  Dashboard-to-Explore replacement (F06). Restoring the original callback
+  permits that replacement during reconciliation. The remaining duplicate
+  completion and stale native dispatch cases are recorded in
+  [Harden deferred route exits](../harden-deferred-route-exits/proposal.md).
+  Retained Admin history after auth changes is a separate
+  [authorization investigation](../harden-admin-navigation-authorization/proposal.md).
 - **Dashboard.** Delegate only the terminal decision after account, visit,
   generation and recovery checks. A failed preflight consumes no authority.
   Keep the one-action latch and its resets after admitted dispatch. Earlier
@@ -166,8 +162,8 @@ independent of navigation ownership.
 Verify tap, keyboard and semantics activation through the shared control and
 test router outcomes. A deterministic widget input interleaving can establish
 a real ordering issue without measuring field frequency. Keep simulated
-system Back and gesture tests separate from physical verification. NAV-01
-remains open. Preserve the [iOS release gates](../../../docs/performance/image-rendering-implementation.md#ios-release-gates)
+system Back and gesture tests separate from physical verification. NAV-01,
+physical Android predictive Back and physical interactive iOS Back remain open. Preserve the [iOS release gates](../../../docs/performance/image-rendering-implementation.md#ios-release-gates)
 for genuine VoiceOver Nearby Retry activation and physical Profile memory,
 scrolling and raster checks, including the existing release-owner decision
 boundary. General router restoration and native route-reporting behavior

@@ -316,7 +316,7 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminSubmission,
             name: RouteNames.adminSubmissionEditor,
-            onExit: adminExit.exitEditorRoute,
+            onExit: adminExit.exit,
             builder: (context, state) {
               final id = RouteParameters.submissionId(
                 state.pathParameters['id'],

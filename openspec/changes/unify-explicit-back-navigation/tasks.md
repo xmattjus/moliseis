@@ -16,7 +16,12 @@
 
 - [x] 3.1 Run focused routing, restoration and widget regressions, including keyboard and semantics activation, system Back and simulated predictive and native gesture cases. Keep NAV-01 open. Track physical gestures and the existing iOS VoiceOver Nearby Retry and Profile gates separately from simulated results. Validate OpenSpec and compare canonical diagnostics by identity against main.
 
-## 4. Concurrent departures and reconciliation
+## 4. Ordinary reconciliation and lifecycle
 
-- [x] 4.1 Reproduce overlapping leading, companion and system Back requests on a pushed malformed Admin diagnostic. Qualify deferred approval against the exact live match and commit. Verify one result, retained dirty editor identity, rejection against a replacement or intervening cover, an eligible retry, and the sign-out redirect during reconciliation.
-- [x] 4.2 Exercise consecutive committed refreshes with and without intervening Page reconciliation, immediate refresh after a synchronous pop, matched and unmatched error replacement, and stale callbacks during a transition and after disposal. Exercise framework gesture ownership, cancellation and completion. Verify test sensitivity by temporarily removing the relevant discriminants and deferred completion protection.
+- [x] 4.2 Exercise consecutive committed refreshes with and without intervening Page reconciliation, immediate refresh after a synchronous pop, matched and unmatched error replacement, and stale callbacks during a transition and after disposal. Exercise framework gesture ownership, cancellation and completion. Verify test sensitivity by temporarily removing the relevant discriminants.
+- [x] 4.4 Verify that both explicit diagnostic controls reject a committed but uninstalled cover and that explicit Back rejects an obsolete push after refresh. Verify a subsequent eligible single diagnostic departure. Remove the deferred-exit wrapper and verify legitimate declarative replacement during reconciliation.
+
+Deferred work from 4.1 and 4.3 is tracked in
+[Harden deferred route exits](../harden-deferred-route-exits/proposal.md).
+[Admin navigation authorization](../harden-admin-navigation-authorization/proposal.md)
+is a separate investigation.

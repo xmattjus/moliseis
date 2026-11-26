@@ -3,15 +3,18 @@
 ## Purpose
 
 Define ordinary app-owned Back departures and consistent native presentation
-while preserving feature and platform navigation ownership.
+while preserving feature and platform navigation ownership. The ordinary
+pop and result guarantees apply to synchronous departures. Protected
+asynchronous exits retain their existing policy and completion path.
 
 ## ADDED Requirements
 
 ### Requirement: Ordinary Back acts only for its originating route
 
 An ordinary Back activation SHALL verify that its displayed Route still owns
-the requested departure in the committed navigation stack. A permitted pop
-SHALL remove only that originating Route and reveal its actual predecessor.
+the requested departure in the committed navigation stack. A permitted
+synchronous pop SHALL remove only that originating Route and reveal its actual
+predecessor.
 A denied activation SHALL make no secondary navigation request.
 
 #### Scenario: An inactive or covered route still exists
@@ -93,17 +96,21 @@ Unmatched errors SHALL require the current displayed root error source.
 #### Scenario: The existing malformed Admin diagnostic is shown
 
 - **WHEN** the user activates either Back control on the diagnostic
-- **THEN** it requests only a permitted departure to its predecessor through
-  the existing protected exit policy, with no Explore fallback or removal of
-  an underlying editor
+- **THEN** it qualifies the source before dispatch and makes no request if
+  the diagnostic is covered, obsolete or otherwise ineligible
+- **AND** an eligible activation requests only a departure to the actual
+  predecessor through the existing protected exit policy, with no Explore
+  fallback
+- **AND** a single ordinary diagnostic departure preserves an underlying
+  editor and its retained draft
 
-#### Scenario: Diagnostic departures overlap
+#### Scenario: A legitimate declarative replacement precedes cover installation
 
-- **WHEN** explicit or native requests overlap on the same pushed malformed
-  Admin diagnostic while its exit policy is pending
-- **THEN** at most one request completes that diagnostic's live push result
-- **AND** an obsolete result, retained editor or newly committed cover is
-  unaffected by the departure
+- **WHEN** Settings has committed above a pushed diagnostic but the diagnostic
+  is still installed, and an authenticated Dashboard stack without an active
+  dirty editor is declaratively replaced by Explore
+- **THEN** the existing exit policy permits the replacement without retry
+- **AND** the replacement leaves both push results pending
 
 ### Requirement: Shared Back has native presentation and interaction
 
