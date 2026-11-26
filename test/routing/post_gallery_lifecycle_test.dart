@@ -160,7 +160,9 @@ void main() {
       await fixture.tapPhoto();
       await _frames(tester);
       final original = fixture.match;
-      final shown = ModalRoute.of(tester.element(fixture.gallery));
+      final shown = ModalRoute.of(tester.element(fixture.gallery))!;
+      final page = shown.settings;
+      expect(shown.popDisposition, RoutePopDisposition.pop);
       final back = find.byType(BackButton);
       TestGesture? press;
       if (keyboard) {
@@ -187,7 +189,13 @@ void main() {
       final live = fixture.match;
       expect(live.pageKey, original.pageKey);
       expect(live.completer, isNot(same(original.completer)));
+      expect(
+        live.matches.pathParameters,
+        isNot(same(original.matches.pathParameters)),
+      );
+      expect(shown.settings, same(page));
       expect(ModalRoute.of(tester.element(fixture.gallery)), same(shown));
+      expect(shown.isCurrent, isTrue);
 
       if (keyboard) {
         await tester.sendKeyEvent(LogicalKeyboardKey.enter);
@@ -206,6 +214,8 @@ void main() {
       } else {
         await tester.tap(back);
       }
+      expect(live.completer.isCompleted, isTrue);
+      expect(original.completer.isCompleted, isFalse);
       fixture.router.refresh();
       await _frames(tester);
       expect(fixture.gallery, findsNothing);

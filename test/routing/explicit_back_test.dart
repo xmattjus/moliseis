@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/theme_brightness.dart';
 import 'package:moliseis/routing/explicit_back.dart';
 import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
+import 'package:moliseis/ui/category/widgets/category_screen.dart';
 import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
@@ -151,6 +152,215 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final reconcileBetweenRefreshes in [false, true]) {
+    testOwnerUI(
+      'consecutive Settings refreshes (reconcile: $reconcileBetweenRefreshes)',
+      (tester) async {
+        final fixture = buildSyncRouterApp(SyncHarness(gated: false));
+        final router = fixture.router;
+        final delegate = router.routerDelegate;
+        final provider = router.routeInformationProvider;
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
+        final explore = find.byType(ExploreScreen);
+        final predecessor = ModalRoute.of(tester.element(explore))!;
+        unawaited(router.push<void>('/settings'));
+        await tester.pumpAndSettle();
+        final settings = find.byType(SettingsScreen);
+        final installed = tester.element(settings);
+        final source = ModalRoute.of(installed)!;
+        final back = find.byType(BackButton);
+        final oldBack = tester.widget<BackButton>(back).onPressed!;
+        final initial =
+            delegate.currentConfiguration.last as ImperativeRouteMatch;
+        final matches = [initial];
+        expect(source.isCurrent, isTrue);
+        expect(source.popDisposition, RoutePopDisposition.pop);
+        expect(predecessor.isActive, isTrue);
+
+        for (var i = 0; i < 2; i++) {
+          final page = source.settings;
+          expect(source.navigator!.widget.pages.last, same(page));
+          final installedParameters = GoRouterState.of(
+            installed,
+          ).pathParameters;
+          final previous = matches.last;
+          router.refresh();
+          await tester.idle();
+          final committed = delegate.currentConfiguration;
+          final live = committed.last as ImperativeRouteMatch;
+          matches.add(live);
+          expect(live.pageKey, initial.pageKey);
+          expect(live.completer, isNot(same(previous.completer)));
+          expect(
+            live.matches.pathParameters,
+            isNot(same(previous.matches.pathParameters)),
+          );
+          expect(live.matches.pathParameters, isNot(same(installedParameters)));
+          expect(ModalRoute.of(installed), same(source));
+          expect(source.settings, same(page));
+          expect(source.isCurrent, isTrue);
+
+          final routeInformation = provider.value;
+          oldBack();
+          await tester.idle();
+          expect(delegate.currentConfiguration, same(committed));
+          expect(provider.value, same(routeInformation));
+          expect(
+            matches.every((match) => !match.completer.isCompleted),
+            isTrue,
+          );
+          expect(source.isCurrent, isTrue);
+          expect(predecessor.isActive, isTrue);
+
+          if (reconcileBetweenRefreshes) {
+            await tester.pumpAndSettle();
+            expect(ModalRoute.of(installed), same(source));
+            expect(source.settings, isNot(same(page)));
+            expect(
+              GoRouterState.of(installed).pathParameters,
+              same(live.matches.pathParameters),
+            );
+          }
+        }
+
+        await tester.pumpAndSettle();
+        expect(ModalRoute.of(tester.element(settings)), same(source));
+        expect(
+          GoRouterState.of(installed).pathParameters,
+          same(matches.last.matches.pathParameters),
+        );
+        // The original control still belongs to this same physical Route.
+        oldBack();
+        expect(matches.last.completer.isCompleted, isTrue);
+        expect(
+          delegate.currentConfiguration.matches,
+          isNot(contains(matches.last)),
+        );
+        final popped = delegate.currentConfiguration;
+        router.refresh();
+        await tester.idle();
+        expect(delegate.currentConfiguration.matches, popped.matches);
+        await tester.pumpAndSettle();
+        expect(settings, findsNothing);
+        expect(ModalRoute.of(tester.element(explore)), same(predecessor));
+        expect(
+          matches.take(2).every((match) => !match.completer.isCompleted),
+          isTrue,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final commitGesture in [false, true]) {
+    testOwnerUI(
+      'outgoing Login cannot pop Settings (gesture commit: $commitGesture)',
+      (tester) async {
+        final fixture = buildSyncRouterApp(SyncHarness(gated: false));
+        final router = fixture.router;
+        final delegate = router.routerDelegate;
+        final provider = router.routeInformationProvider;
+        await tester.pumpWidget(fixture.app);
+        await tester.pumpAndSettle();
+        final explore = find.byType(ExploreScreen);
+        final home = ModalRoute.of(tester.element(explore))!;
+        unawaited(router.push<void>('/settings'));
+        await tester.pumpAndSettle();
+        final settings = find.byType(SettingsScreen);
+        final predecessor = ModalRoute.of(tester.element(settings))!;
+        final parentMatch =
+            delegate.currentConfiguration.last as ImperativeRouteMatch;
+        unawaited(router.push<void>('/admin/login'));
+        await tester.pumpAndSettle();
+        final login = find.byType(AdminLoginScreen);
+        final source = tester.element(login);
+        final outgoing = ModalRoute.of(source)!;
+        final outgoingPage = outgoing.settings;
+        final parentPage = predecessor.settings;
+        final navigator = outgoing.navigator!;
+        final childMatch =
+            delegate.currentConfiguration.last as ImperativeRouteMatch;
+        final back = tester
+            .widget<BackButton>(find.byType(BackButton))
+            .onPressed!;
+        final stacked = delegate.currentConfiguration;
+        expect(outgoing.isCurrent, isTrue);
+        expect(outgoing.popDisposition, RoutePopDisposition.pop);
+        expect(navigator.widget.pages.last, same(outgoingPage));
+        expect(predecessor.navigator, same(navigator));
+        expect(parentMatch.completer.isCompleted, isFalse);
+        expect(childMatch.completer.isCompleted, isFalse);
+
+        // Exercise the framework's TransitionRoute gesture lifecycle directly.
+        outgoing.handleStartBackGesture(progress: 0.7);
+        expect(navigator.userGestureInProgress, isTrue);
+        final beforeGestureBack = provider.value;
+        back();
+        expect(delegate.currentConfiguration, same(stacked));
+        expect(provider.value, same(beforeGestureBack));
+        expect(childMatch.completer.isCompleted, isFalse);
+        expect(outgoing.isCurrent, isTrue);
+
+        if (commitGesture) {
+          outgoing.handleCommitBackGesture();
+        } else {
+          outgoing.handleCancelBackGesture();
+          await tester.pumpAndSettle();
+          expect(navigator.userGestureInProgress, isFalse);
+          expect(outgoing.isCurrent, isTrue);
+          expect(delegate.currentConfiguration, same(stacked));
+          back();
+        }
+
+        expect(childMatch.completer.isCompleted, isTrue);
+        expect(delegate.currentConfiguration.last, same(parentMatch));
+        expect(source.mounted, isTrue);
+        expect(predecessor.settings, same(parentPage));
+        expect(outgoing.isCurrent, isFalse);
+        final popped = delegate.currentConfiguration;
+        final afterPop = provider.value;
+        back();
+        expect(delegate.currentConfiguration, same(popped));
+        expect(provider.value, same(afterPop));
+        expect(parentMatch.completer.isCompleted, isFalse);
+
+        await tester.pump();
+        expect(source.mounted, isTrue);
+        expect(outgoing.settings, same(outgoingPage));
+        expect(outgoing.animation!.status, AnimationStatus.reverse);
+        expect(ModalRoute.of(tester.element(settings)), same(predecessor));
+        expect((predecessor.settings as Page).key, (parentPage as Page).key);
+        final beforeTransitionBack = provider.value;
+        back();
+        expect(provider.value, same(beforeTransitionBack));
+        expect(delegate.currentConfiguration, same(popped));
+        expect(parentMatch.completer.isCompleted, isFalse);
+
+        await tester.pumpAndSettle();
+        expect(navigator.userGestureInProgress, isFalse);
+        expect(source.mounted, isFalse);
+        expect(predecessor.isCurrent, isTrue);
+        final beforeDisposedBack = provider.value;
+        back();
+        expect(provider.value, same(beforeDisposedBack));
+        expect(delegate.currentConfiguration, same(popped));
+        expect(parentMatch.completer.isCompleted, isFalse);
+
+        if (commitGesture) {
+          await tester.tap(find.byType(BackButton));
+        } else {
+          expect(await tester.binding.handlePopRoute(), isTrue);
+        }
+        expect(parentMatch.completer.isCompleted, isTrue);
+        await tester.pumpAndSettle();
+        expect(settings, findsNothing);
+        expect(ModalRoute.of(tester.element(explore)), same(home));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testOwnerUI('Search Post Back waits for active, uncovered branch ownership', (
     tester,
@@ -384,6 +594,11 @@ void main() {
         tester.widget<RouteErrorScreen>(error).error,
         same(live.matches.error),
       );
+      final afterReconciliation = provider.value;
+      oldBack(reconciled);
+      expect(provider.value, same(afterReconciliation));
+      expect(live.completer.isCompleted, isFalse);
+      expect(errorRoute.isCurrent, isTrue);
       await tester.tap(back);
       await tester.pumpAndSettle();
       expect(live.completer.isCompleted, isTrue);
@@ -403,6 +618,129 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testOwnerUI(
+    'matched error Back follows its reconciled Route across A → B → A',
+    (tester) async {
+      final fixture = buildSyncRouterApp(SyncHarness(gated: false));
+      final router = fixture.router..go('/home/category/nature/posts/invalid');
+      final delegate = router.routerDelegate;
+      await tester.pumpWidget(fixture.app);
+      await tester.pumpAndSettle();
+      final error = find.byType(RouteErrorScreen);
+      final element = tester.element(error);
+      final state = tester.state(error);
+      final route = ModalRoute.of(element)!;
+      final initialPage = route.settings;
+      final back = tester
+          .widget<BackButton>(find.byType(BackButton))
+          .onPressed!;
+      final category = find.byType(CategoryScreen, skipOffstage: false);
+      final predecessor = ModalRoute.of(tester.element(category))!;
+      expect(route.isCurrent, isTrue);
+      expect(route.popDisposition, RoutePopDisposition.pop);
+      expect(predecessor.isActive, isTrue);
+
+      router.go('/home/category/nature/posts/unknown');
+      await tester.idle();
+      final intermediate = delegate.currentConfiguration;
+      expect(intermediate.uri.path, endsWith('/unknown'));
+      expect(
+        tester.widget<RouteErrorScreen>(error).uri.path,
+        endsWith('/invalid'),
+      );
+      expect(route.settings, same(initialPage));
+      expect(route.isCurrent, isTrue);
+      final routeInformation = router.routeInformationProvider.value;
+      back();
+      expect(delegate.currentConfiguration, same(intermediate));
+      expect(router.routeInformationProvider.value, same(routeInformation));
+      expect(predecessor.isActive, isTrue);
+
+      await tester.pumpAndSettle();
+      expect(tester.state(error), same(state));
+      expect(ModalRoute.of(tester.element(error)), same(route));
+      expect(
+        tester.widget<RouteErrorScreen>(error).uri.path,
+        endsWith('/unknown'),
+      );
+      router.go('/home/category/nature/posts/invalid');
+      await tester.pumpAndSettle();
+      expect(tester.state(error), same(state));
+      expect(ModalRoute.of(tester.element(error)), same(route));
+      expect(
+        tester.widget<RouteErrorScreen>(error).uri.path,
+        endsWith('/invalid'),
+      );
+
+      back();
+      expect(delegate.currentConfiguration.uri.path, '/home/category/nature');
+      await tester.pumpAndSettle();
+      expect(element.mounted, isFalse);
+      expect(ModalRoute.of(tester.element(category)), same(predecessor));
+      final popped = delegate.currentConfiguration;
+      back();
+      expect(delegate.currentConfiguration, same(popped));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testOwnerUI('a replaced error cannot pop the newly installed route', (
+    tester,
+  ) async {
+    final fixture = buildSyncRouterApp(SyncHarness(gated: false));
+    final router = fixture.router..go('/settings');
+    final delegate = router.routerDelegate;
+    await tester.pumpWidget(fixture.app);
+    await tester.pumpAndSettle();
+    final settings = find.byType(SettingsScreen);
+    final predecessor = ModalRoute.of(tester.element(settings))!;
+    unawaited(router.push<void>('/no-such-page'));
+    await tester.pumpAndSettle();
+    final error = find.byType(RouteErrorScreen);
+    final source = tester.element(error);
+    final outgoing = ModalRoute.of(source)!;
+    final page = outgoing.settings;
+    final oldBack = tester
+        .widget<BackButton>(find.byType(BackButton))
+        .onPressed!;
+    final obsolete = delegate.currentConfiguration.last as ImperativeRouteMatch;
+    expect(outgoing.isCurrent, isTrue);
+    expect(outgoing.popDisposition, RoutePopDisposition.pop);
+    expect(predecessor.isActive, isTrue);
+
+    unawaited(router.pushReplacement<void>('/gallery'));
+    await tester.idle();
+    final committed = delegate.currentConfiguration;
+    final replacement = committed.last as ImperativeRouteMatch;
+    expect(replacement.pageKey, isNot(obsolete.pageKey));
+    expect(outgoing.isCurrent, isTrue);
+    expect(outgoing.settings, same(page));
+    final information = router.routeInformationProvider.value;
+    oldBack();
+    expect(delegate.currentConfiguration, same(committed));
+    expect(router.routeInformationProvider.value, same(information));
+    expect(obsolete.completer.isCompleted, isFalse);
+    expect(replacement.completer.isCompleted, isFalse);
+
+    await tester.pumpAndSettle();
+    final gallery = find.byType(GalleryUnavailableScreen);
+    final installed = ModalRoute.of(tester.element(gallery))!;
+    expect(installed, isNot(same(outgoing)));
+    expect(installed.isCurrent, isTrue);
+    expect(source.mounted, isFalse);
+    oldBack();
+    expect(delegate.currentConfiguration, same(committed));
+    expect(obsolete.completer.isCompleted, isFalse);
+    expect(replacement.completer.isCompleted, isFalse);
+    await tester.tap(find.text('Torna indietro'));
+    expect(replacement.completer.isCompleted, isTrue);
+    await tester.pumpAndSettle();
+    expect(gallery, findsNothing);
+    expect(obsolete.completer.isCompleted, isFalse);
+    expect(ModalRoute.of(tester.element(settings)), same(predecessor));
+    expect(tester.takeException(), isNull);
+  });
 
   testOwnerUI('Gallery Unavailable keeps its text-only Back action', (
     tester,

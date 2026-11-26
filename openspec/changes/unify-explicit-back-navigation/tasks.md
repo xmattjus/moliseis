@@ -15,3 +15,8 @@
 ## 3. Compatibility and release gates
 
 - [x] 3.1 Run focused routing, restoration and widget regressions, including keyboard and semantics activation, system Back and simulated predictive and native gesture cases. Keep NAV-01 open. Track physical gestures and the existing iOS VoiceOver Nearby Retry and Profile gates separately from simulated results. Validate OpenSpec and compare canonical diagnostics by identity against main.
+
+## 4. Concurrent departures and reconciliation
+
+- [x] 4.1 Reproduce overlapping leading, companion and system Back requests on a pushed malformed Admin diagnostic. Qualify deferred approval against the exact live match and commit. Verify one result, retained dirty editor identity, rejection against a replacement or intervening cover, an eligible retry, and the sign-out redirect during reconciliation.
+- [x] 4.2 Exercise consecutive committed refreshes with and without intervening Page reconciliation, immediate refresh after a synchronous pop, matched and unmatched error replacement, and stale callbacks during a transition and after disposal. Exercise framework gesture ownership, cancellation and completion. Verify test sensitivity by temporarily removing the relevant discriminants and deferred completion protection.

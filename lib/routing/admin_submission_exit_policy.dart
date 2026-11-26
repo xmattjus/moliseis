@@ -8,6 +8,7 @@ import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/use_cases/admin_draft_session.dart';
 import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/route_parameters.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
@@ -377,6 +378,49 @@ final class AdminSubmissionExitPolicy {
       if (identical(_moderationClose, visit)) _moderationClose = null;
     });
     return true;
+  }
+
+  /// Applies editor exit policy and qualifies deferred diagnostic results.
+  Future<bool> exitEditorRoute(BuildContext context, GoRouterState state) {
+    if (RouteParameters.submissionId(state.pathParameters['id']) != null) {
+      return exit(context, state);
+    }
+    final delegate = GoRouter.of(context).routerDelegate;
+    final configuration = delegate.currentConfiguration;
+    if (identical(configuration.pathParameters, state.pathParameters)) {
+      return exit(context, state);
+    }
+
+    final match = configuration.matches
+        .whereType<ImperativeRouteMatch>()
+        .where((match) => match.pageKey == state.pageKey)
+        .firstOrNull;
+    if (match == null ||
+        !identical(match.matches.pathParameters, state.pathParameters)) {
+      return Future.value(false);
+    }
+    final installedTop =
+        delegate.navigatorKey.currentState?.widget.pages.lastOrNull;
+    // A native pop can still reach the diagnostic before a committed cover
+    // is installed. A full-stack exit can evaluate an already covered page.
+    if (installedTop?.key == match.pageKey &&
+        !identical(configuration.lastOrNull, match)) {
+      return Future.value(false);
+    }
+
+    final decision = Completer<bool>.sync();
+    unawaited(
+      exit(context, state).then((allowed) {
+        // Resume GoRouter inline so the configuration it commits is visible
+        // to the next decision, before a second approval can complete the push.
+        decision.complete(
+          allowed &&
+              context.mounted &&
+              identical(configuration, delegate.currentConfiguration),
+        );
+      }, onError: decision.completeError),
+    );
+    return decision.future;
   }
 
   /// Decides one actual removal or one query-only identity rebind.

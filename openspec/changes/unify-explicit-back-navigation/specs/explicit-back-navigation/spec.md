@@ -97,6 +97,14 @@ Unmatched errors SHALL require the current displayed root error source.
   the existing protected exit policy, with no Explore fallback or removal of
   an underlying editor
 
+#### Scenario: Diagnostic departures overlap
+
+- **WHEN** explicit or native requests overlap on the same pushed malformed
+  Admin diagnostic while its exit policy is pending
+- **THEN** at most one request completes that diagnostic's live push result
+- **AND** an obsolete result, retained editor or newly committed cover is
+  unaffected by the departure
+
 ### Requirement: Shared Back has native presentation and interaction
 
 Shared Back SHALL preserve the themed platform glyph, RTL direction, icon

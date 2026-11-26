@@ -98,10 +98,14 @@ should cover rejection before reconciliation and success afterward on the
 retained Route. In a separate Settings probe the references converged on
 the same Route after build, an equivalent restore kept it usable, and a
 later Back with immediate refresh closed it and completed only the live
-result. No Page construction changes, local binding state,
-result repair, pending protocol, global identity tracking or new Navigator
-infrastructure are needed. Ordinary declarative pages use their existing
-route and committed ownership information.
+result. Consecutive refresh tests let each replacement commit before
+requesting the next refresh. They observe both unreconciled and reconciled
+successive replacements and compare the Page key, map reference and
+completer of each match. Another activation during an exit transition or
+after disposal cannot remove the predecessor. A callback still attached
+to the same physical matched Route can act again after reconciliation.
+Ordinary declarative pages use their existing route and committed
+ownership information.
 
 ### Error controls
 
@@ -126,8 +130,18 @@ independent of navigation ownership.
   within its own route, without authorizing removal of a retained editor.
   A realistic producer of malformed imperative entries justifying a
   wider change was not established. Typed inputs alone do not prove
-  positivity. Legacy restoration and deferred-exit concurrency remain
-  existing router limitations.
+  positivity. Overlapping explicit and system Back can reach deferred
+  `onExit` on the same installed diagnostic and complete its push result
+  twice. A newer cover can also commit while the diagnostic is still
+  installed. The malformed imperative diagnostic checks the match's
+  path-parameter map identity and refuses a pop against an unreconciled
+  cover. For an allowed decision it rechecks the committed configuration
+  and delivers the verdict synchronously to the awaiting delegate, so a
+  second decision sees the completed departure. A rejected request leaves
+  a reconciled diagnostic eligible for a new attempt. The existing
+  dirty-editor policy still evaluates editor departures and full-stack
+  replacement. Legacy restoration remains an
+  upstream limitation.
 - **Dashboard.** Delegate only the terminal decision after account, visit,
   generation and recovery checks. A failed preflight consumes no authority.
   Keep the one-action latch and its resets after admitted dispatch. Earlier
