@@ -48,9 +48,27 @@ void main() {
     expect(commits.every((commit) => commit.isNotEmpty), isTrue);
     expect(tester.takeException(), isNull);
     final explore = router.routerDelegate.currentConfiguration;
-    requestExplicitBack(tester.element(find.byType(ExploreScreen)));
-    await tester.pumpAndSettle();
-    expect(router.routerDelegate.currentConfiguration, same(explore));
+    final provider = router.routeInformationProvider;
+    final initialInformation = provider.value;
+    var notifications = 0;
+    void recordNotification() => notifications++;
+
+    provider.addListener(recordNotification);
+    try {
+      requestExplicitBack(tester.element(find.byType(ExploreScreen)));
+      expect(
+        notifications,
+        0,
+        reason: 'Back at canonical Explore must not notify the router.',
+      );
+      expect(provider.value, same(initialInformation));
+      await tester.pumpAndSettle();
+      expect(notifications, 0);
+      expect(provider.value, same(initialInformation));
+      expect(router.routerDelegate.currentConfiguration, same(explore));
+    } finally {
+      provider.removeListener(recordNotification);
+    }
   });
 
   testOwnerUI('pushed Login reveals the same Settings route and state', (
@@ -173,9 +191,19 @@ void main() {
       builder: (_) => const AlertDialog(content: Text('Root popup')),
     );
     await tester.pumpAndSettle();
+    final popup = ModalRoute.of(tester.element(find.text('Root popup')))!;
+    final provider = router.routeInformationProvider;
+    final beforePopupBack = provider.value;
+    final popupConfiguration = router.routerDelegate.currentConfiguration;
     expect(route.isCurrent, isTrue);
     back();
-    expect(find.text('Root popup'), findsOneWidget);
+    expect(popup.isCurrent, isTrue);
+    expect(popup.isActive, isTrue);
+    expect(provider.value, same(beforePopupBack));
+    expect(
+      router.routerDelegate.currentConfiguration,
+      same(popupConfiguration),
+    );
     expect(router.state.uri.path, '/home/search_results/posts/1');
     router.configuration.navigatorKey.currentState!.pop();
     await tester.pumpAndSettle();
@@ -185,8 +213,14 @@ void main() {
     final covered = router.routerDelegate.currentConfiguration;
     expect(router.state.uri.path, '/settings');
     expect(route.isCurrent, isTrue);
+    final coveringPush = covered.last as ImperativeRouteMatch;
+    final beforeCoveredBack = provider.value;
     back();
+    expect(provider.value, same(beforeCoveredBack));
     expect(router.routerDelegate.currentConfiguration, same(covered));
+    expect(coveringPush.completer.isCompleted, isFalse);
+    expect(route.isActive, isTrue);
+    expect(route.isCurrent, isTrue);
     await tester.pumpAndSettle();
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
@@ -196,9 +230,20 @@ void main() {
     await tester.idle();
     expect(router.state.uri.path, '/favourites');
     expect(route.isCurrent, isTrue);
+    final favourites = router.routerDelegate.currentConfiguration;
+    final beforeBranchBuild = provider.value;
     back();
+    expect(provider.value, same(beforeBranchBuild));
+    expect(router.routerDelegate.currentConfiguration, same(favourites));
+    expect(route.isActive, isTrue);
+    expect(route.isCurrent, isTrue);
     await tester.pumpAndSettle();
+    final beforeInactiveBack = provider.value;
     back();
+    expect(provider.value, same(beforeInactiveBack));
+    expect(router.routerDelegate.currentConfiguration, same(favourites));
+    expect(route.isActive, isTrue);
+    expect(route.isCurrent, isTrue);
     expect(router.state.uri.path, '/favourites');
 
     await tester.tap(find.text('Esplora'));
@@ -269,13 +314,26 @@ void main() {
       final errorState = tester.widget<RouteErrorScreen>(error);
       final source = tester.element(error);
       final oldBack = errorState.onBack!;
+      final errorRoute = ModalRoute.of(source)!;
+      final original =
+          router.routerDelegate.currentConfiguration.last
+              as ImperativeRouteMatch;
+      expect(original.matches.error, same(errorState.error));
       showDialog<void>(
         context: source,
         builder: (_) => const AlertDialog(content: Text('Covers error')),
       );
       await tester.pumpAndSettle();
+      final popup = ModalRoute.of(tester.element(find.text('Covers error')))!;
+      final provider = router.routeInformationProvider;
+      final beforeCoveredBack = provider.value;
+      final covered = router.routerDelegate.currentConfiguration;
       oldBack(source);
-      expect(find.text('Covers error'), findsOneWidget);
+      expect(popup.isCurrent, isTrue);
+      expect(popup.isActive, isTrue);
+      expect(provider.value, same(beforeCoveredBack));
+      expect(router.routerDelegate.currentConfiguration, same(covered));
+      expect(original.completer.isCompleted, isFalse);
       router.configuration.navigatorKey.currentState!.pop();
       await tester.pumpAndSettle();
 
@@ -284,19 +342,57 @@ void main() {
       final live =
           router.routerDelegate.currentConfiguration.last
               as ImperativeRouteMatch;
+      expect(live, isNot(same(original)));
+      expect(live.pageKey, original.pageKey);
+      expect(live.matches.error, isA<GoException>());
       expect(live.matches.error, isNot(same(errorState.error)));
-      oldBack(source);
-      await tester.idle();
-      expect(router.routerDelegate.currentConfiguration.last, same(live));
-      expect(live.completer.isCompleted, isFalse);
+      expect(live.completer, isNot(same(original.completer)));
+      expect(ModalRoute.of(source), same(errorRoute));
+      expect(errorRoute.isCurrent, isTrue);
+      final staleConfiguration = router.routerDelegate.currentConfiguration;
+      final beforeStaleBack = provider.value;
+      var notifications = 0;
+      void recordNotification() => notifications++;
+
+      provider.addListener(recordNotification);
+      try {
+        oldBack(source);
+        await tester.idle();
+        expect(
+          original.completer.isCompleted,
+          isFalse,
+          reason: 'Stale error Back must leave the original push pending.',
+        );
+        expect(live.completer.isCompleted, isFalse);
+        expect(
+          router.routerDelegate.currentConfiguration,
+          same(staleConfiguration),
+        );
+        expect(router.routerDelegate.currentConfiguration.last, same(live));
+        expect(errorRoute.isActive, isTrue);
+        expect(errorRoute.isCurrent, isTrue);
+        expect(notifications, 0);
+        expect(provider.value, same(beforeStaleBack));
+      } finally {
+        provider.removeListener(recordNotification);
+      }
+
       await tester.pumpAndSettle();
+      final reconciled = tester.element(error);
+      expect(ModalRoute.of(reconciled), same(errorRoute));
+      expect(
+        tester.widget<RouteErrorScreen>(error).error,
+        same(live.matches.error),
+      );
       await tester.tap(back);
       await tester.pumpAndSettle();
       expect(live.completer.isCompleted, isTrue);
+      expect(original.completer.isCompleted, isFalse);
       expect(
         ModalRoute.of(tester.element(find.byType(SettingsScreen))),
         same(predecessor),
       );
+      expect(tester.takeException(), isNull);
 
       router.go('/home/category/nature/posts/invalid');
       await tester.pumpAndSettle();
@@ -333,7 +429,7 @@ void main() {
   });
 
   for (final branch in [false, true]) {
-    testOwnerUI('an unassociated Page fails closed (branch: $branch)', (
+    testOwnerUI('Back rejects an uninstalled Page (branch: $branch)', (
       tester,
     ) async {
       final fixture = buildSyncRouterApp(SyncHarness(gated: false));
@@ -349,8 +445,8 @@ void main() {
       final owner = (shell?.navigatorKey ?? router.configuration.navigatorKey)
           .currentState!;
       const unassociatedKey = ValueKey('unassociated back');
-      // A Page supplied directly to Navigator is unknown to GoRouter.
-      // Reuse the live key so the association itself must reject this source.
+      // The local Page shares the live key but is absent from Navigator.pages.
+      // Back rejects it at the installed-Page identity check.
       final unassociated = MaterialPage<void>(
         key: match.pageKey,
         child: const Scaffold(
@@ -366,7 +462,12 @@ void main() {
       }
       expect(owner.widget.pages, isNot(contains(unassociated.settings)));
 
+      final provider = router.routeInformationProvider;
+      final beforeBack = provider.value;
       await tester.tap(control);
+      expect(provider.value, same(beforeBack));
+      expect(unassociated.isActive, isTrue);
+      expect(unassociated.isCurrent, isTrue);
       await tester.pumpAndSettle();
       expect(unassociated.isCurrent, isTrue);
       expect(router.routerDelegate.currentConfiguration, same(committed));
@@ -380,6 +481,7 @@ void main() {
     final canPop = ValueNotifier(false);
     addTearDown(canPop.dispose);
     final button = find.byType(CustomBackButton);
+    final popAttempts = <bool>[];
     final router = GoRouter(
       initialLocation: '/home/protected',
       routes: [
@@ -394,6 +496,8 @@ void main() {
                 valueListenable: canPop,
                 builder: (_, allowed, _) => PopScope(
                   canPop: allowed,
+                  onPopInvokedWithResult: (didPop, _) =>
+                      popAttempts.add(didPop),
                   child: const Scaffold(
                     body: Center(child: CustomBackButton()),
                   ),
@@ -408,22 +512,35 @@ void main() {
     await tester.pumpWidget(MaterialApp.router(routerConfig: router));
     await tester.pumpAndSettle();
     final configuration = router.routerDelegate.currentConfiguration;
+    final provider = router.routeInformationProvider;
+    final route = ModalRoute.of(tester.element(button))!;
+    final beforeVeto = provider.value;
     await tester.tap(button);
+    expect(popAttempts, isEmpty);
+    expect(provider.value, same(beforeVeto));
+    expect(route.isCurrent, isTrue);
     await tester.pumpAndSettle();
     expect(router.routerDelegate.currentConfiguration, same(configuration));
 
     canPop.value = true;
     await tester.pumpAndSettle();
-    final route = ModalRoute.of(tester.element(button))!;
-    final history = LocalHistoryEntry();
+    var historyRemoved = false;
+    final history = LocalHistoryEntry(onRemove: () => historyRemoved = true);
     route.addLocalHistoryEntry(history);
+    final beforeLocalHistoryBack = provider.value;
     await tester.tap(button);
+    expect(historyRemoved, isFalse);
+    expect(popAttempts, isEmpty);
+    expect(provider.value, same(beforeLocalHistoryBack));
+    expect(route.isCurrent, isTrue);
     await tester.pumpAndSettle();
     expect(route.willHandlePopInternally, isTrue);
     expect(router.routerDelegate.currentConfiguration, same(configuration));
     history.remove();
+    expect(historyRemoved, isTrue);
     await tester.tap(button);
     await tester.pumpAndSettle();
+    expect(popAttempts, [true]);
     expect(find.text('Explore'), findsOneWidget);
   });
 }

@@ -31,6 +31,7 @@ import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dar
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
+import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
@@ -188,13 +189,48 @@ void main() {
           await tester.pumpWidget(harness.app());
           await tester.pumpAndSettle();
 
-          final back = tester.widget<IconButton>(find.byType(BackButton));
-          final onPressed = back.onPressed!;
-          await tester.tap(find.byType(BackButton));
-          onPressed();
-          await tester.pumpAndSettle();
+          final router = harness.router;
+          final back = find.byType(BackButton);
+          final source = tester.element(back);
+          final dashboardRoute = ModalRoute.of(source)!;
+          final onPressed = tester.widget<BackButton>(back).onPressed!;
+          final dashboard = router.routerDelegate.currentConfiguration;
+          final provider = router.routeInformationProvider;
+          final requests = <RouteInformation>[];
+          void recordRequest() => requests.add(provider.value);
 
-          expect(harness.router.state.uri.path, RoutePaths.home);
+          provider.addListener(recordRequest);
+          try {
+            // Deliver the release and retry in the same turn, before GoRouter
+            // can commit the fallback and invalidate the Dashboard callback.
+            final pointer = TestPointer();
+            tester.binding.handlePointerEvent(
+              pointer.down(tester.getCenter(back), view: tester.view),
+            );
+            tester.binding.handlePointerEvent(pointer.up(view: tester.view));
+
+            expect(requests.map((request) => request.uri), [
+              Uri.parse(RoutePaths.home),
+            ], reason: 'The pointer tap must request Explore on its own.');
+            final request = provider.value;
+            expect(request, same(requests.single));
+            expect(router.routerDelegate.currentConfiguration, same(dashboard));
+            expect(source.mounted, isTrue);
+            expect(dashboardRoute.isCurrent, isTrue);
+
+            onPressed();
+            expect(requests, hasLength(1));
+            expect(provider.value, same(request));
+            expect(router.routerDelegate.currentConfiguration, same(dashboard));
+
+            await tester.pumpAndSettle();
+            expect(requests, hasLength(1));
+          } finally {
+            provider.removeListener(recordRequest);
+          }
+
+          expect(router.state.uri, Uri.parse(RoutePaths.home));
+          expect(find.byType(ExploreScreen), findsOneWidget);
           expect(find.byType(AdminDashboardScreen), findsNothing);
           expect(find.byType(AdminLoginScreen), findsNothing);
           expect(harness.auth.viewModel.isAdmin, isTrue);
@@ -271,9 +307,32 @@ void main() {
 
             await tester.pumpAndSettle();
             final callback = tester.widget<BackButton>(back).onPressed!;
+            final provider = harness.router.routeInformationProvider;
             await tester.tap(back);
-            callback();
-            expect(live.completer.isCompleted, isTrue);
+            expect(
+              live.completer.isCompleted,
+              isTrue,
+              reason: 'The pointer tap must complete the live push on its own.',
+            );
+            expect(original.completer.isCompleted, isFalse);
+            final afterTap = harness.router.routerDelegate.currentConfiguration;
+            final routeInformation = provider.value;
+            var notifications = 0;
+            void recordNotification() => notifications++;
+
+            provider.addListener(recordNotification);
+            try {
+              callback();
+              expect(notifications, 0);
+              expect(provider.value, same(routeInformation));
+              expect(
+                harness.router.routerDelegate.currentConfiguration,
+                same(afterTap),
+              );
+              expect(original.completer.isCompleted, isFalse);
+            } finally {
+              provider.removeListener(recordNotification);
+            }
           }
           await tester.pumpAndSettle();
           expect(harness.router.state.uri.path, RoutePaths.settings);
