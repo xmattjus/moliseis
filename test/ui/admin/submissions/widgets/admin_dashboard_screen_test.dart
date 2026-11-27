@@ -294,48 +294,72 @@ void main() {
       },
     );
 
-    testOwnerUI(
-      'D1 revocation removes Dashboard error feedback and preserves '
-      'unrelated app feedback',
-      (tester) async {
-        await tester.pumpWidget(
-          MaterialApp.router(
-            scaffoldMessengerKey: $scaffoldMessengerKey,
-            routerConfig: router,
-          ),
-        );
-        await tester.pumpAndSettle();
-        repository.listResult = Result.error(
-          TestException('synthetic failure'),
-        );
-        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
-        await pumpCommandTurns(tester);
-        await tester.pumpAndSettle();
-        const privateFeedback =
-            "Si è verificato un errore durante l'aggiornamento dei contenuti";
-        expect(find.text(privateFeedback), findsOneWidget);
-        showSnackBar(
-          context: tester.element(find.byType(AdminDashboardScreen)),
-          textContent: 'PUBLIC_FEEDBACK_SENTINEL',
-        );
-        await tester.pumpAndSettle();
-        expect(find.text('PUBLIC_FEEDBACK_SENTINEL'), findsOneWidget);
-        auth
-          ..setUser(null)
-          ..emit(AuthChangeEvent.signedOut);
-        await tester.idle();
-        await tester.pump();
-        expect(find.text(privateFeedback, skipOffstage: false), findsNothing);
-        router.goNamed(RouteNames.home);
-        await tester.pumpAndSettle();
-        expect(find.text('PUBLIC_FEEDBACK_SENTINEL'), findsOneWidget);
-        expect(find.text(privateFeedback, skipOffstage: false), findsNothing);
-      },
-      disposeOwners: () {
-        viewModel.dispose();
-        auth.dispose();
-      },
-    );
+    for (final queued in [false, true]) {
+      testOwnerUI(
+        'D1 retires Dashboard feedback only (queued: $queued)',
+        (tester) async {
+          await tester.pumpWidget(
+            MaterialApp.router(
+              scaffoldMessengerKey: $scaffoldMessengerKey,
+              routerConfig: router,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final context = tester.element(find.byType(AdminDashboardScreen));
+          const first = 'FIRST_PUBLIC_FEEDBACK';
+          const last = 'LAST_PUBLIC_FEEDBACK';
+          const dashboardError =
+              "Si è verificato un errore durante l'aggiornamento dei contenuti";
+          if (queued) {
+            showSnackBar(context: context, textContent: first);
+            await tester.pumpAndSettle();
+          }
+          repository.listResult = Result.error(
+            TestException('synthetic failure'),
+          );
+          await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+          await pumpCommandTurns(tester);
+          await tester.pumpAndSettle();
+          expect(
+            find.text(dashboardError),
+            queued ? findsNothing : findsOneWidget,
+          );
+          showSnackBar(context: context, textContent: last);
+          await tester.pumpAndSettle();
+          expect(find.text(last), findsNothing);
+
+          // The setUp fixture subscribed to Auth outside the widget clock.
+          await tester.runAsync(() async {
+            auth
+              ..setUser(makeAuthUser(isAdmin: true))
+              ..emit(AuthChangeEvent.signedIn);
+            await Future<void>.delayed(Duration.zero);
+          });
+          router.goNamed(RouteNames.home);
+          await tester.pumpAndSettle();
+          expect(find.text(dashboardError, skipOffstage: false), findsNothing);
+          if (queued) {
+            expect(find.text(first), findsOneWidget);
+            expect(find.text(last), findsNothing);
+            $scaffoldMessengerKey.currentState!.hideCurrentSnackBar();
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 250));
+            expect(find.text(dashboardError), findsNothing);
+            await tester.pumpAndSettle();
+          }
+          expect(find.text(last), findsOneWidget);
+          expect(find.text(dashboardError, skipOffstage: false), findsNothing);
+          clearAppSnackBars();
+          await tester.pumpAndSettle();
+          expect(find.byType(SnackBar), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+        disposeOwners: () {
+          viewModel.dispose();
+          auth.dispose();
+        },
+      );
+    }
 
     testOwnerUI(
       'ignored source without pending can be reactivated and returned '

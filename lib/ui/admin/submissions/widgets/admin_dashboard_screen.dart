@@ -73,7 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _lookupScheduled = false;
   (bool, AdminSubmissionStatus?)? _selection;
   Object? _manualRefresh;
-  var _feedbackMessenger = GlobalKey<ScaffoldMessengerState>();
+  ValueNotifier<bool> _feedbackRetired = ValueNotifier(false);
   // Dismissed reads retain their prior placeholders until safe settlement.
   final _manualReads =
       <(AdminSubmissionsViewModel, bool), ({Object token, bool hadError})>{};
@@ -164,8 +164,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _retireRecovery();
   }
 
+  void _retireFeedback() {
+    _feedbackRetired.value = true;
+    _feedbackRetired.dispose();
+  }
+
   void _resetVisit() {
-    _feedbackMessenger = GlobalKey<ScaffoldMessengerState>();
+    _retireFeedback();
+    _feedbackRetired = ValueNotifier(false);
     _visit++;
     _revokePresentation();
     _recoveryAttempt = null;
@@ -386,7 +392,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _candidate = identity;
     _cancelRecovery = showPersistentSnackBar(
       context: context,
-      messengerKey: _feedbackMessenger,
       textContent: 'Hai una modifica interrotta da recuperare.',
       actionLabel: 'Riprendi',
       onActionPressed: () => unawaited(_resumeCandidate(authority, identity)),
@@ -458,10 +463,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (fresh != identity) {
       _recoveryAttempt = null;
       if (result is Error<AdminSubmissionDraft?>) {
-        showSnackBarGenericError(
-          context: context,
-          messengerKey: _feedbackMessenger,
-        );
+        showSnackBarGenericError(context: context, retired: _feedbackRetired);
       }
       if (fresh != null) _presentRecovery(authority, fresh);
       return;
@@ -550,6 +552,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void dispose() {
     _unbind();
+    _retireFeedback();
     _visit++;
     _revokePresentation();
     _editorVisit = null;
@@ -647,7 +650,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         outcome.outcome == AdminDashboardRefreshOutcome.unexpectedFailure) {
       showSnackBar(
         context: context,
-        messengerKey: _feedbackMessenger,
+        retired: _feedbackRetired,
         textContent:
             "Si è verificato un errore durante l'aggiornamento dei contenuti",
         type: SnackBarType.error,
@@ -747,7 +750,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final viewModel = widget.viewModel;
     if (viewModel.isDisposed) return const SizedBox.shrink();
 
-    final dashboard = Scaffold(
+    return Scaffold(
       body: RefreshIndicator.noSpinner(
         key: ValueKey((viewModel, viewModel.showIgnored)),
         onRefresh: () => _refreshVisible(viewModel),
@@ -1106,11 +1109,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           label: const Text('Nuovo contributo'),
         ),
       ),
-    );
-    // Keep the app messenger's public surface registered while private
-    // feedback is owned by the same subtree as the Dashboard presentation.
-    return Scaffold(
-      body: ScaffoldMessenger(key: _feedbackMessenger, child: dashboard),
     );
   }
 }

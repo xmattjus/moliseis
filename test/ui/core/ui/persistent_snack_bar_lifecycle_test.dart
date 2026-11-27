@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/ui/core/ui/custom_snack_bar.dart';
 import 'package:moliseis/utils/extensions/build_context_extensions.dart';
 
@@ -271,6 +272,75 @@ void main() {
     },
   );
 
+  testWidgets(
+    'recovery waits for surviving ordinary feedback after retirement',
+    (tester) async {
+      final harness = PersistentSnackBarHarness();
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.app());
+      final retired = ValueNotifier(false);
+      addTearDown(retired.dispose);
+      var validations = 0;
+      showPersistentSnackBar(
+        context: harness.context,
+        textContent: 'Recovery',
+        actionLabel: 'Riprendi',
+        onActionPressed: () {},
+        onDismissed: () {},
+        revalidate: () async => ++validations <= 1,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Recovery'), findsOneWidget);
+
+      showSnackBar(
+        context: harness.context,
+        textContent: 'Owned',
+        retired: retired,
+      );
+      showSnackBar(
+        context: harness.context,
+        textContent: 'Surviving',
+        duration: SnackBarDuration.extrashort,
+      );
+      retired.value = true;
+      await tester.pumpAndSettle();
+      expect(find.text('Owned'), findsNothing);
+      expect(find.text('Surviving'), findsOneWidget);
+      expect(find.text('Recovery'), findsNothing);
+      expect(validations, 1);
+
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+      expect(find.byType(SnackBar), findsNothing);
+      expect(validations, 2);
+    },
+  );
+
+  testWidgets(
+    'native dismissal in the retirement turn preserves the next entry',
+    (tester) async {
+      final harness = PersistentSnackBarHarness();
+      addTearDown(harness.dispose);
+      await tester.pumpWidget(harness.app());
+      final retired = ValueNotifier(false);
+      addTearDown(retired.dispose);
+      showSnackBar(
+        context: harness.context,
+        textContent: 'Owned',
+        retired: retired,
+      );
+      showSnackBar(context: harness.context, textContent: 'Surviving');
+      await tester.pumpAndSettle();
+      expect(find.text('Owned'), findsOneWidget);
+
+      retired.value = true;
+      $scaffoldMessengerKey.currentState!.removeCurrentSnackBar();
+      await tester.pumpAndSettle();
+      expect(find.text('Owned'), findsNothing);
+      expect(find.text('Surviving'), findsOneWidget);
+    },
+  );
+
   testWidgets('feedback arriving during validation revokes its stale result', (
     tester,
   ) async {
@@ -515,13 +585,19 @@ void main() {
       addTearDown(harness.dispose);
       await tester.pumpWidget(harness.app());
       await tester.pumpAndSettle();
-      for (final text in ['Ordinary A', 'Ordinary B']) {
-        showSnackBar(
-          context: harness.context,
-          textContent: text,
-          duration: SnackBarDuration.long,
-        );
-      }
+      final retired = ValueNotifier(false);
+      addTearDown(retired.dispose);
+      showSnackBar(
+        context: harness.context,
+        textContent: 'Ordinary A',
+        duration: SnackBarDuration.long,
+      );
+      showSnackBar(
+        context: harness.context,
+        textContent: 'Ordinary B',
+        duration: SnackBarDuration.long,
+        retired: retired,
+      );
       var oldValidations = 0;
       final cancelOld = showPersistentSnackBar(
         context: harness.context,
@@ -538,9 +614,16 @@ void main() {
       expect(find.text('Ordinary A'), findsOneWidget);
       expect(oldValidations, 0);
       clearAppSnackBars();
+      retired.value = true;
+      showSnackBar(
+        context: harness.context,
+        textContent: 'Fresh ordinary',
+        duration: SnackBarDuration.extrashort,
+      );
       await tester.pumpAndSettle();
       expect(find.text('Ordinary A'), findsNothing);
       expect(find.text('Ordinary B'), findsNothing);
+      expect(find.text('Fresh ordinary'), findsOneWidget);
       showPersistentSnackBar(
         context: harness.context,
         textContent: 'Fresh recovery',
