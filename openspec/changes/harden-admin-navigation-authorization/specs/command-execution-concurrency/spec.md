@@ -42,6 +42,12 @@ After observed Admin authority loss or replacement, obsolete Admin history SHALL
 - **THEN** public ancestry and the current eligible public destination are preserved where possible
 - **AND** running or fatal sync retains precedence, validated public return targets retain existing behavior, and stale Admin return targets resolve to the authorized landing without restoring their history or arguments
 
+#### Scenario: The public Content Submission route survives retirement
+- **GIVEN** the public form covers obsolete Admin history, with or without its active Progress page
+- **WHEN** Admin reconciliation retains those pages
+- **THEN** the original form and applicable Progress pages retain their route, draft, operation and transition ownership without a new exit decision, checkpoint or discard
+- **AND** a pending or later navigation that genuinely removes the form remains subject to its existing exit protections
+
 #### Scenario: Navigation is restored or a decision is pending
 - **WHEN** saved route state or an obsolete async navigation or exit decision would otherwise reinstall or preserve an Admin visit from ended authority
 - **THEN** the old visit and its associated pageless routes cannot resume
@@ -55,6 +61,12 @@ Dashboard data, action state and feedback SHALL be available only to their conti
 - **WHEN** Dashboard authority is lost or replaced while the old page or dialog is still mounted
 - **THEN** the old rows, contributor names, ignored-source information, command snapshots, pending revision IDs, recovery and mutation or refresh feedback cannot be rendered, accessed through semantics, or acted on in the next render or transition frame
 - **AND** obsolete callbacks are inert at observed revocation
+
+#### Scenario: Dashboard feedback shares ordinary application ordering
+- **GIVEN** Dashboard and unrelated ordinary feedback share the application Snackbar queue
+- **WHEN** Dashboard authority ends with previously admitted feedback visible or queued
+- **THEN** its feedback is withdrawn without clearing, reordering or shortening unrelated messages
+- **AND** recovery retains its existing suspension, revalidation, dismissal and explicit global clearing policies
 
 #### Scenario: Another Admin opens Dashboard
 - **WHEN** B gains access in place of A

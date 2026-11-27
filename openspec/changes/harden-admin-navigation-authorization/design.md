@@ -303,12 +303,30 @@ reservations and removes its exact dialog; Progress bypasses its exit veto
 when the committed configuration retires. Unrelated public auth events
 leave navigation untouched.
 
+GoRouter 18.1.4 compares the old and new route-match sequences and checks
+the exiting suffix after the first difference. Removing an Admin match
+beneath the public Content Submission form can therefore ask the same
+form to exit. The reconciliation restore carries the exact source and
+replacement configurations through the parser and delegate continuation.
+The public exit policy accepts that callback only when the current
+retiring source and the approved replacement contain the identical
+imperative match for its Page key. The original form and any current
+Progress Page retain their route and operation ownership. A genuine
+public exit still owns its existing decision. If a public go has arrived
+but has no exit decision yet, reconciliation removes Admin history first
+and reissues that request from the committed safe configuration only
+while its route information is still current.
+
 A Dashboard owner binds before its first read, drops protected state on
 revocation, rejects later execution boundaries, and lets physical work
-settle privately. The protected Scaffold subtree owns its feedback messenger
-so revocation removes even queued private feedback. Public app feedback can
-use its own messenger concurrently. Recovery retains the existing
-suspension, ownership and revalidation rules. The Editor captures route
+settle privately. Both ordinary Dashboard errors use the application
+ScaffoldMessenger. The Dashboard retires its visit's feedback signal.
+An owned entry waits for its predecessor in Flutter's queue before it can
+withdraw, suppresses retired content, and relinquishes removal authority
+when it closes or the queue resets. Unrelated entries retain their order
+and duration. The existing persistent recovery request keeps its selective
+cancellation, ordinary-tail suspension and authoritative revalidation.
+The Editor captures route
 authority before activation, with the existing draft session checking the
 captured authority at lookup and installation boundaries. Revocation clears
 runtime state and preserves the account-qualified durable checkpoint and
@@ -342,6 +360,22 @@ its fresh Editor request and keeps its original reservation assertions.
   outside the permanent diff.
 - The [disposable runtime results](test-plan.md#observed-local-runtime-results)
   include actual gateway effects and the shared SDK request boundary.
+
+### Independent review remediation
+
+The affected Flutter suites passed 1,923 tests. The complete Flutter suite
+passed 4,529 tests with five existing skips. NAV-01 passed with its original
+assertions. Formatting, Flutter analysis and strict validation of this
+change passed.
+
+The reviewed routing implementation failed the dirty, pending operation
+and existing exit-decision cases. The repaired path also passed a refresh
+that reparsed the same reconciliation request. Temporary negative controls
+showed that removing the retained-route qualification restores the original
+routing failures. Removing same-turn dismissal protection or queue reset
+invalidation allowed a stale retirement to remove the next Snackbar.
+The backend and dependency inputs are unchanged from the verified
+implementation. The local runtime evidence and open release gates still apply.
 
 ## Risks and verification boundaries
 

@@ -72,6 +72,13 @@ reentrancy, fully qualified pending Editor activation, mixed restoration
 or device behavior. Add command-level coverage for duplicated settlement
 paths only where existing coverage does not assert the changed boundary.
 
+## Independent review regressions
+
+| ID | Characterization at the reviewed implementation | Regression acceptance |
+| --- | --- | --- |
+| R1 | In Home → Admin → public form, retiring Admin opened a dirty-exit dialog or left Admin in installed history during submission or finalization. An already pending public go could also leave Admin beneath the open decision. The ordinary submit flow pushes Progress above the form as a separate match. | Assert the actual Navigator removes the obsolete Admin Page and keeps the original form, owner and match, and keeps the original Progress route during finalization. No security-triggered checkpoint, discard or exit dialog. Test genuine Back while dirty or submitting, and a pending public go before or during its decision, including approval and cancellation. |
+| R2 | Refresh errors could appear concurrently with unrelated app feedback or before an already-visible app message. | Exercise visible and queued Dashboard retirement with unrelated feedback before or after it. Check same-turn native dismissal, recovery revalidation after the surviving tail, and global clearing with a queued owned entry. Retain the existing Dashboard authority and DRAFT-11/DRAFT-12 regressions. |
+
 ## Disposable Supabase runtime gate
 
 Use a disposable local stack with the repository's actual gateway, Auth,
