@@ -147,6 +147,7 @@ void main() {
           ),
           GoRoute(
             path: '/home',
+            name: RouteNames.home,
             builder: (_, _) => const Scaffold(body: Text('HOME_MARKER')),
           ),
           GoRoute(

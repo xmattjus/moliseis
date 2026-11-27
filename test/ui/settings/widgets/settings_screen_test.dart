@@ -601,7 +601,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(SettingsScreen), findsOneWidget);
-      await tester.tap(find.byTooltip('Indietro'));
+      await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
 
       expect(router.routeInformationProvider.value.uri.path, RoutePaths.home);
@@ -622,7 +622,7 @@ void main() {
         RoutePaths.settings,
       );
 
-      await tester.tap(find.byTooltip('Indietro'));
+      await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
 
       expect(router.routeInformationProvider.value.uri.path, RoutePaths.home);

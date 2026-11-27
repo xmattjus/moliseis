@@ -1,7 +1,5 @@
-import 'dart:io' show Platform;
-
-import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/routing/explicit_back.dart';
 
 class CustomBackButton extends StatelessWidget {
   const CustomBackButton({
@@ -13,29 +11,31 @@ class CustomBackButton extends StatelessWidget {
 
   final EdgeInsetsGeometry? padding;
 
-  /// The callback that is called when the button is tapped or otherwise
-  /// activated.
-  ///
-  /// If this is set to null, [Navigator.pop] will be called instead.
-  final void Function()? onPressed;
+  /// Handles activation in place of the ordinary app Back action.
+  final VoidCallback? onPressed;
 
   final Color? backgroundColor;
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Indietro',
-      child: Padding(
-        padding: padding ?? const EdgeInsets.all(8),
-        child: IconButton(
-          onPressed: onPressed ?? () => Navigator.pop(context),
+    final theme = Theme.of(context);
+    final mobile = switch (theme.platform) {
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.fuchsia => true,
+      _ => false,
+    };
+    return Padding(
+      padding: padding ?? (mobile ? EdgeInsets.zero : const EdgeInsets.all(8)),
+      child: Align(
+        widthFactor: 1,
+        heightFactor: 1,
+        child: BackButton(
+          onPressed: onPressed ?? () => requestExplicitBack(context),
           style: IconButton.styleFrom(
-            padding: EdgeInsets.only(left: Platform.isIOS ? 10.0 : 0),
-            backgroundColor:
-                backgroundColor ?? Theme.of(context).colorScheme.surface,
-          ),
-          icon: Icon(
-            Platform.isIOS ? Symbols.arrow_back_ios : Symbols.arrow_back,
+            backgroundColor: backgroundColor ?? theme.colorScheme.surface,
+            visualDensity: mobile ? VisualDensity.standard : null,
+            tapTargetSize: mobile ? MaterialTapTargetSize.padded : null,
           ),
         ),
       ),

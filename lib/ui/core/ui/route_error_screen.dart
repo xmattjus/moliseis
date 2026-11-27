@@ -1,6 +1,6 @@
-import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:moliseis/routing/route_names.dart';
+import 'package:moliseis/routing/explicit_back.dart';
+import 'package:moliseis/ui/core/ui/custom_back_button.dart';
 import 'package:moliseis/ui/core/ui/empty_view.dart';
 import 'package:moliseis/utils/logging/logging.dart';
 import 'package:provider/provider.dart';
@@ -10,8 +10,7 @@ import 'package:provider/provider.dart';
 ///
 /// The router's `errorBuilder` renders this screen for unmatched locations,
 /// and route builders render it directly when canonical parameters fail
-/// validation. The back control pops the route when one can be popped and
-/// falls back to the home tab otherwise.
+/// validation. Both Back controls use the policy for the displayed route.
 ///
 /// This screen is the single logging call site for unknown URIs: every path
 /// that renders it emits one error-level [RouteErrorScreenShown] event so
@@ -20,13 +19,21 @@ import 'package:provider/provider.dart';
 /// state) also emits an event for the new failure; an equivalent rebuild does
 /// not.
 class RouteErrorScreen extends StatefulWidget {
-  const RouteErrorScreen({required this.uri, required this.error, super.key});
+  const RouteErrorScreen({
+    required this.uri,
+    required this.error,
+    this.onBack,
+    super.key,
+  });
 
   /// The URI that could not be matched or parsed.
   final Uri uri;
 
   /// The parsing or validation error, when available.
   final Object? error;
+
+  /// Supplies the departure policy for a router error or a protected route.
+  final ValueChanged<BuildContext>? onBack;
 
   @override
   State<RouteErrorScreen> createState() => _RouteErrorScreenState();
@@ -67,26 +74,20 @@ class _RouteErrorScreenState extends State<RouteErrorScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      leading: BackButton(onPressed: () => _popOrGoHome(context)),
-      title: const Text('Pagina non trovata'),
-    ),
-    body: EmptyView.error(
-      text: const Text('La pagina richiesta non è stata trovata'),
-      action: FilledButton(
-        onPressed: () => _popOrGoHome(context),
-        child: const Text('Indietro'),
-      ),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final onBack = widget.onBack ?? requestExplicitBack;
+    void back() => onBack(context);
 
-  void _popOrGoHome(BuildContext context) {
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.goNamed(RouteNames.home);
-    }
+    return Scaffold(
+      appBar: AppBar(
+        leading: CustomBackButton(onPressed: back),
+        title: const Text('Pagina non trovata'),
+      ),
+      body: EmptyView.error(
+        text: const Text('La pagina richiesta non è stata trovata'),
+        action: FilledButton(onPressed: back, child: const Text('Indietro')),
+      ),
+    );
   }
 }
 

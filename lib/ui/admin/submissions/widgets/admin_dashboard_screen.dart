@@ -7,6 +7,7 @@ import 'package:moliseis/domain/models/admin_submission_draft.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/routing/admin_submission_exit_policy.dart';
+import 'package:moliseis/routing/explicit_back.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
@@ -302,11 +303,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   /// Explicit root Back falls home; system Back retains platform root behavior.
   void _back(_DashboardAuthority? authority) {
     if (authority == null || !_live(authority) || _backRequested) return;
-    _backRequested = true;
-    _revokePresentation();
-    authority.router.canPop()
-        ? authority.router.pop()
-        : authority.router.go(RoutePaths.home);
+    requestExplicitBack(
+      context,
+      onAdmitted: () {
+        _backRequested = true;
+        _revokePresentation();
+      },
+    );
   }
 
   void _scheduleLookup() {

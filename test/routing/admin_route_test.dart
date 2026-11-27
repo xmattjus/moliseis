@@ -31,6 +31,7 @@ import 'package:moliseis/ui/admin/submissions/widgets/admin_dashboard_screen.dar
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/core/ui/route_error_screen.dart';
 import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
+import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/settings/view_models/settings_view_model.dart';
 import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
@@ -169,49 +170,93 @@ void main() {
       },
     );
 
-    testOwnerUI(
-      'dashboard AppBar Back falls back to Home '
-      'and ignores a repeated callback',
-      (tester) async {
-        harness = _AdminRouteHarness(
-          initialUser: makeAuthUser(
-            isAdmin: true,
-            id: AdminDraftSessionHarness.accountA,
-          ),
-        );
-        harness.router.go(RoutePaths.admin);
-        await tester.pumpWidget(harness.app());
-        await tester.pumpAndSettle();
+    for (final width in [430.0, 1000.0]) {
+      testOwnerUI(
+        'dashboard AppBar Back falls back to Home '
+        'and ignores a repeated callback (width: $width)',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          harness = _AdminRouteHarness(
+            initialUser: makeAuthUser(
+              isAdmin: true,
+              id: AdminDraftSessionHarness.accountA,
+            ),
+          );
+          harness.router.go(RoutePaths.admin);
+          await tester.pumpWidget(harness.app());
+          await tester.pumpAndSettle();
 
-        final back = tester.widget<IconButton>(
-          find.descendant(
-            of: find.byTooltip('Indietro'),
-            matching: find.byType(IconButton),
-          ),
-        );
-        final onPressed = back.onPressed!;
-        onPressed();
-        onPressed();
-        await tester.pumpAndSettle();
+          final router = harness.router;
+          final back = find.byType(BackButton);
+          final source = tester.element(back);
+          final dashboardRoute = ModalRoute.of(source)!;
+          final onPressed = tester.widget<BackButton>(back).onPressed!;
+          final dashboard = router.routerDelegate.currentConfiguration;
+          final provider = router.routeInformationProvider;
+          final requests = <RouteInformation>[];
+          void recordRequest() => requests.add(provider.value);
 
-        expect(harness.router.state.uri.path, RoutePaths.home);
-        expect(find.byType(AdminDashboardScreen), findsNothing);
-        expect(find.byType(AdminLoginScreen), findsNothing);
-        expect(harness.auth.viewModel.isAdmin, isTrue);
-      },
-      disposeOwners: () {
-        harness.editor.dispose();
-        harness.auth.dispose();
-        harness.syncViewModel.dispose();
-        harness.router.dispose();
-      },
-    );
+          provider.addListener(recordRequest);
+          try {
+            // Deliver the release and retry in the same turn, before GoRouter
+            // can commit the fallback and invalidate the Dashboard callback.
+            final pointer = TestPointer();
+            tester.binding.handlePointerEvent(
+              pointer.down(tester.getCenter(back), view: tester.view),
+            );
+            tester.binding.handlePointerEvent(pointer.up(view: tester.view));
 
-    for (final systemBack in [false, true]) {
+            expect(requests.map((request) => request.uri), [
+              Uri.parse(RoutePaths.home),
+            ], reason: 'The pointer tap must request Explore on its own.');
+            final request = provider.value;
+            expect(request, same(requests.single));
+            expect(router.routerDelegate.currentConfiguration, same(dashboard));
+            expect(source.mounted, isTrue);
+            expect(dashboardRoute.isCurrent, isTrue);
+
+            onPressed();
+            expect(requests, hasLength(1));
+            expect(provider.value, same(request));
+            expect(router.routerDelegate.currentConfiguration, same(dashboard));
+
+            await tester.pumpAndSettle();
+            expect(requests, hasLength(1));
+          } finally {
+            provider.removeListener(recordRequest);
+          }
+
+          expect(router.state.uri, Uri.parse(RoutePaths.home));
+          expect(find.byType(ExploreScreen), findsOneWidget);
+          expect(find.byType(AdminDashboardScreen), findsNothing);
+          expect(find.byType(AdminLoginScreen), findsNothing);
+          expect(harness.auth.viewModel.isAdmin, isTrue);
+        },
+        disposeOwners: () {
+          harness.editor.dispose();
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
+      );
+    }
+
+    for (final (systemBack, width) in [
+      (false, 430.0),
+      (false, 1000.0),
+      (true, 430.0),
+    ]) {
       testOwnerUI(
         'authenticated Settings keeps its route and state '
-        'with system Back=$systemBack',
+        'with system Back=$systemBack (width: $width)',
         (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = Size(width, 800);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
           harness = _AdminRouteHarness(
             initialUser: makeAuthUser(
               isAdmin: true,
@@ -240,16 +285,54 @@ void main() {
           if (systemBack) {
             expect(await tester.binding.handlePopRoute(), isTrue);
           } else {
-            final callback = tester
-                .widget<IconButton>(
-                  find.descendant(
-                    of: find.byTooltip('Indietro'),
-                    matching: find.byType(IconButton),
-                  ),
-                )
-                .onPressed!;
-            callback();
-            callback();
+            final back = find.byType(BackButton);
+            final original =
+                harness.router.routerDelegate.currentConfiguration.last
+                    as ImperativeRouteMatch;
+            final press = await tester.startGesture(tester.getCenter(back));
+            harness.router.refresh();
+            await tester.idle();
+            final live =
+                harness.router.routerDelegate.currentConfiguration.last
+                    as ImperativeRouteMatch;
+            expect(live.completer, isNot(same(original.completer)));
+            await press.up();
+            await tester.idle();
+            expect(
+              harness.router.routerDelegate.currentConfiguration.last,
+              same(live),
+            );
+            expect(original.completer.isCompleted, isFalse);
+            expect(live.completer.isCompleted, isFalse);
+
+            await tester.pumpAndSettle();
+            final callback = tester.widget<BackButton>(back).onPressed!;
+            final provider = harness.router.routeInformationProvider;
+            await tester.tap(back);
+            expect(
+              live.completer.isCompleted,
+              isTrue,
+              reason: 'The pointer tap must complete the live push on its own.',
+            );
+            expect(original.completer.isCompleted, isFalse);
+            final afterTap = harness.router.routerDelegate.currentConfiguration;
+            final routeInformation = provider.value;
+            var notifications = 0;
+            void recordNotification() => notifications++;
+
+            provider.addListener(recordNotification);
+            try {
+              callback();
+              expect(notifications, 0);
+              expect(provider.value, same(routeInformation));
+              expect(
+                harness.router.routerDelegate.currentConfiguration,
+                same(afterTap),
+              );
+              expect(original.completer.isCompleted, isFalse);
+            } finally {
+              provider.removeListener(recordNotification);
+            }
           }
           await tester.pumpAndSettle();
           expect(harness.router.state.uri.path, RoutePaths.settings);
@@ -301,12 +384,7 @@ void main() {
           await tester.pumpWidget(harness.app());
           await tester.pumpAndSettle();
           final callback = tester
-              .widget<IconButton>(
-                find.descendant(
-                  of: find.byTooltip('Indietro'),
-                  matching: find.byType(IconButton),
-                ),
-              )
+              .widget<IconButton>(find.byType(BackButton))
               .onPressed!;
           if (transition == 'sign out') {
             harness.auth.setUser(null);
@@ -473,6 +551,18 @@ void main() {
 
         expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
         expect(find.byType(AdminLoginScreen), findsOneWidget);
+        final configuration = harness.router.routerDelegate;
+        expect(configuration.currentConfiguration.matches, hasLength(1));
+        final commits = <RouteMatchList>[];
+        configuration.addListener(
+          () => commits.add(configuration.currentConfiguration),
+        );
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(harness.router.state.uri.path, RoutePaths.home);
+        expect(commits, isNotEmpty);
+        expect(commits.every((commit) => commit.isNotEmpty), isTrue);
+        expect(tester.takeException(), isNull);
       },
       disposeOwners: () {
         harness.editor.dispose();
@@ -556,7 +646,7 @@ void main() {
 
         expect(settingsRoute.isActive, isTrue);
         expect(settingsRoute.isCurrent, isFalse);
-        await tester.tap(find.byTooltip('Indietro'));
+        await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
 
         expect(
@@ -764,7 +854,7 @@ void main() {
         expect(harness.repository.getByIdIds, [1]);
         expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
         expect(find.text('Caricamento in corso...'), findsOneWidget);
-        final back = find.byTooltip('Indietro');
+        final back = find.byType(BackButton);
         expect(back.hitTestable(), findsOneWidget);
         await tester.tap(back);
         // The existing exit policy refuses navigation while the detail load
@@ -786,7 +876,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(find.byType(AdminSubmissionEditorScreen), findsOneWidget);
-        final readyBack = find.byTooltip('Indietro');
+        final readyBack = find.byType(BackButton);
         expect(readyBack.hitTestable(), findsOneWidget);
         await tester.tap(readyBack);
         await tester.pumpAndSettle();
@@ -1555,7 +1645,7 @@ void main() {
     }
 
     testOwnerUI(
-      'shows the route error screen for an invalid submission id',
+      'diagnostic rejects explicit Back against an obsolete push after refresh',
       (tester) async {
         harness = _AdminRouteHarness(
           initialUser: makeAuthUser(
@@ -1563,12 +1653,56 @@ void main() {
             id: AdminDraftSessionHarness.accountA,
           ),
         );
-
-        harness.router.go('/admin/submissions/abc');
+        final router = harness.router..go('/admin/submissions/new');
+        final delegate = router.routerDelegate;
         await tester.pumpWidget(harness.app());
         await tester.pumpAndSettle();
+        final editor = find.byType(AdminSubmissionEditorScreen);
+        final predecessor = ModalRoute.of(tester.element(editor))!;
+        unawaited(router.push<bool>('/admin/submissions/abc'));
+        await tester.pumpAndSettle();
+        final error = find.byType(RouteErrorScreen);
+        final diagnostic = ModalRoute.of(tester.element(error))!;
+        final page = diagnostic.settings;
+        final original =
+            delegate.currentConfiguration.last as ImperativeRouteMatch;
+        router.refresh();
+        await tester.idle();
+        final refreshed = delegate.currentConfiguration;
+        final live = refreshed.last as ImperativeRouteMatch;
+        expect(live.pageKey, original.pageKey);
+        expect(live.completer, isNot(same(original.completer)));
+        expect(
+          live.matches.pathParameters,
+          isNot(same(original.matches.pathParameters)),
+        );
+        expect(diagnostic.settings, same(page));
+        expect(diagnostic.isCurrent, isTrue);
+        expect(diagnostic.popDisposition, RoutePopDisposition.pop);
+        expect(predecessor.isActive, isTrue);
 
-        expect(find.byType(RouteErrorScreen), findsOneWidget);
+        final information = router.routeInformationProvider.value;
+        tester.widget<BackButton>(find.byType(BackButton)).onPressed!();
+        await tester.idle();
+        expect(router.routeInformationProvider.value, same(information));
+        expect(delegate.currentConfiguration, same(refreshed));
+        expect(original.completer.isCompleted, isFalse);
+        expect(live.completer.isCompleted, isFalse);
+        expect(diagnostic.isCurrent, isTrue);
+        expect(predecessor.isActive, isTrue);
+
+        await tester.pumpAndSettle();
+        expect(ModalRoute.of(tester.element(error)), same(diagnostic));
+        expect(diagnostic.settings, isNot(same(page)));
+        await tester.tap(find.byType(BackButton));
+        await tester.idle();
+        expect(live.completer.isCompleted, isTrue);
+        expect(original.completer.isCompleted, isFalse);
+        await tester.pumpAndSettle();
+        expect(error, findsNothing);
+        expect(ModalRoute.of(tester.element(editor)), same(predecessor));
+        expect(find.byType(UnsavedChangesDialog), findsNothing);
+        expect(tester.takeException(), isNull);
       },
       disposeOwners: () {
         harness.editor.dispose();
@@ -1577,6 +1711,213 @@ void main() {
         harness.router.dispose();
       },
     );
+
+    testOwnerUI(
+      'declarative diagnostic departure before cover reconciliation',
+      (tester) async {
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
+        final router = harness.router..go(RoutePaths.admin);
+        final delegate = router.routerDelegate;
+        await tester.pumpWidget(harness.app(withSettingsProviders: true));
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminDashboardScreen), findsOneWidget);
+        expect(harness.editor.activation, isNull);
+        unawaited(router.push<bool>('/admin/submissions/abc'));
+        await tester.pumpAndSettle();
+        final error = find.byType(RouteErrorScreen, skipOffstage: false);
+        final source = tester.element(error);
+        final diagnostic = ModalRoute.of(source)!;
+        final page = diagnostic.settings;
+        final original =
+            delegate.currentConfiguration.last as ImperativeRouteMatch;
+        final pathParameters = GoRouterState.of(source).pathParameters;
+        expect(pathParameters, same(original.matches.pathParameters));
+        expect(diagnostic.isCurrent, isTrue);
+        expect(diagnostic.popDisposition, RoutePopDisposition.pop);
+
+        unawaited(router.push<void>(RoutePaths.settings));
+        await tester.idle();
+        final covered = delegate.currentConfiguration;
+        final covering = covered.last as ImperativeRouteMatch;
+        final navigator = delegate.navigatorKey.currentState!;
+        expect(covering.route.name, RouteNames.settings);
+        expect(covered.matches, contains(same(original)));
+        expect(covering.matches.pathParameters, isNot(same(pathParameters)));
+        expect(original.completer.isCompleted, isFalse);
+        expect(covering.completer.isCompleted, isFalse);
+        expect(diagnostic.isCurrent, isTrue);
+        expect(diagnostic.settings, same(page));
+        expect(navigator.widget.pages.last, same(page));
+        final commits = <RouteMatchList>[];
+        delegate.addListener(() => commits.add(delegate.currentConfiguration));
+        router.go(RoutePaths.home);
+        await tester.idle();
+        await tester.pumpAndSettle();
+        expect(commits, hasLength(1));
+        expect(commits.single.isNotEmpty, isTrue);
+        expect(router.state.uri.path, RoutePaths.home);
+        expect(find.byType(ExploreScreen), findsOneWidget);
+        expect(error, findsNothing);
+        expect(original.completer.isCompleted, isFalse);
+        expect(covering.completer.isCompleted, isFalse);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () {
+        harness.editor.dispose();
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    testOwnerUI(
+      'both diagnostic controls reject an uninstalled committed cover',
+      (tester) async {
+        harness = _AdminRouteHarness(
+          initialUser: makeAuthUser(
+            isAdmin: true,
+            id: AdminDraftSessionHarness.accountA,
+          ),
+        );
+        final router = harness.router..go('/admin/submissions/new');
+        final delegate = router.routerDelegate;
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        final editor = find.byType(AdminSubmissionEditorScreen);
+        final predecessor = ModalRoute.of(tester.element(editor))!;
+        unawaited(router.push<bool>('/admin/submissions/abc'));
+        await tester.pumpAndSettle();
+        final error = find.byType(RouteErrorScreen);
+        final diagnostic = ModalRoute.of(tester.element(error))!;
+        final page = diagnostic.settings;
+        final navigator = delegate.navigatorKey.currentState!;
+        final original =
+            delegate.currentConfiguration.last as ImperativeRouteMatch;
+        final leading = tester.widget<BackButton>(find.byType(BackButton));
+        final companion = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'Indietro'),
+        );
+
+        unawaited(router.push<bool>(RoutePaths.admin));
+        await tester.idle();
+        final covered = delegate.currentConfiguration;
+        final covering = covered.last as ImperativeRouteMatch;
+        expect(covering.route.name, RouteNames.adminDashboard);
+        expect(covered.matches, contains(same(original)));
+        expect(diagnostic.isCurrent, isTrue);
+        expect(diagnostic.popDisposition, RoutePopDisposition.pop);
+        expect(navigator.widget.pages.last, same(page));
+
+        final information = router.routeInformationProvider.value;
+        for (final activate in [leading.onPressed!, companion.onPressed!]) {
+          activate();
+          await tester.idle();
+          expect(router.routeInformationProvider.value, same(information));
+          expect(delegate.currentConfiguration, same(covered));
+          expect(original.completer.isCompleted, isFalse);
+          expect(covering.completer.isCompleted, isFalse);
+          expect(diagnostic.isCurrent, isTrue);
+          expect(navigator.widget.pages.last, same(page));
+        }
+
+        await tester.pumpAndSettle();
+        expect(diagnostic.isCurrent, isFalse);
+        expect(navigator.widget.pages.last.key, covering.pageKey);
+        expect(delegate.currentConfiguration, same(covered));
+        router.pop();
+        await tester.pumpAndSettle();
+        expect(covering.completer.isCompleted, isTrue);
+        expect(original.completer.isCompleted, isFalse);
+        expect(ModalRoute.of(tester.element(error)), same(diagnostic));
+        expect(diagnostic.isCurrent, isTrue);
+        await tester.tap(find.byType(BackButton));
+        await tester.pumpAndSettle();
+        expect(original.completer.isCompleted, isTrue);
+        expect(await original.completer.future, isNull);
+        expect(error, findsNothing);
+        expect(ModalRoute.of(tester.element(editor)), same(predecessor));
+        expect(find.byType(UnsavedChangesDialog), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () {
+        harness.editor.dispose();
+        harness.auth.dispose();
+        harness.syncViewModel.dispose();
+        harness.router.dispose();
+      },
+    );
+
+    for (final leading in [true, false]) {
+      testOwnerUI(
+        'malformed editor only departs through its protected pop '
+        '(leading: $leading)',
+        (tester) async {
+          harness = _AdminRouteHarness(
+            initialUser: makeAuthUser(
+              isAdmin: true,
+              id: AdminDraftSessionHarness.accountA,
+            ),
+          );
+          final router = harness.router..go('/admin/submissions/abc');
+          await tester.pumpWidget(harness.app());
+          await tester.pumpAndSettle();
+          final error = find.byType(RouteErrorScreen);
+          final back = leading
+              ? find.byType(BackButton)
+              : find.text('Indietro');
+          expect(error, findsOneWidget);
+          await tester.tap(back);
+          await tester.pumpAndSettle();
+          expect(router.state.uri.path, RoutePaths.admin);
+
+          unawaited(router.push<bool>('/admin/submissions/new'));
+          await tester.pumpAndSettle();
+          final editor = find.byType(AdminSubmissionEditorScreen);
+          final delegate = router.routerDelegate;
+          final editorMatch =
+              delegate.currentConfiguration.last as ImperativeRouteMatch;
+          final editorState = tester.state(editor);
+          final retained = ModalRoute.of(tester.element(editor))!;
+          final owner = harness.editor;
+          owner.setName('Retained dirty draft', activation: owner.activation);
+          expect(owner.hasUncheckpointedChanges, isTrue);
+          unawaited(router.push<bool>('/admin/submissions/abc'));
+          await tester.pumpAndSettle();
+          expect(error, findsOneWidget);
+          expect(retained.isActive, isTrue);
+          expect(retained.isCurrent, isFalse);
+          final diagnostic =
+              delegate.currentConfiguration.last as ImperativeRouteMatch;
+
+          await tester.tap(back);
+          expect(retained.isCurrent, isFalse);
+          await tester.pumpAndSettle();
+          expect(error, findsNothing);
+          expect(ModalRoute.of(tester.element(editor)), same(retained));
+          expect(tester.state(editor), same(editorState));
+          expect(delegate.currentConfiguration.last, same(editorMatch));
+          expect(editorMatch.completer.isCompleted, isFalse);
+          expect(owner.name, 'Retained dirty draft');
+          expect(owner.hasUncheckpointedChanges, isTrue);
+          expect(find.byType(UnsavedChangesDialog), findsNothing);
+          expect(diagnostic.completer.isCompleted, isTrue);
+          expect(await diagnostic.completer.future, isNull);
+          expect(router.state.uri.path, '/admin/submissions/new');
+          expect(tester.takeException(), isNull);
+        },
+        disposeOwners: () {
+          harness.editor.dispose();
+          harness.auth.dispose();
+          harness.syncViewModel.dispose();
+          harness.router.dispose();
+        },
+      );
+    }
   });
 }
 
