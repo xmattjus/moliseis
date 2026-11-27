@@ -30,8 +30,12 @@ enum SnackBarDuration { extrashort, short, medium, long }
 /// Convenience wrapper around [showSnackBar] for failures whose specific
 /// cause should not be shown to the user; the message is a fixed Italian
 /// string ("Si è verificato un errore, riprova più tardi").
-void showSnackBarGenericError({required BuildContext context}) => showSnackBar(
+void showSnackBarGenericError({
+  required BuildContext context,
+  GlobalKey<ScaffoldMessengerState>? messengerKey,
+}) => showSnackBar(
   context: context,
+  messengerKey: messengerKey,
   textContent: 'Si è verificato un errore, riprova più tardi',
   type: SnackBarType.error,
 );
@@ -81,7 +85,8 @@ int _ordinarySnackBarGeneration = 0;
 ///
 /// After ordinary feedback settles, [revalidate] must still authorize the
 /// request before it can be shown again. Native close and swipe call
-/// [onDismissed]; temporary interruption does not.
+/// [onDismissed]; temporary interruption does not. [messengerKey] confines
+/// presentation to an explicitly owned messenger when supplied.
 VoidCallback showPersistentSnackBar({
   required BuildContext context,
   required String textContent,
@@ -89,9 +94,11 @@ VoidCallback showPersistentSnackBar({
   required VoidCallback onActionPressed,
   required Future<bool> Function() revalidate,
   required VoidCallback onDismissed,
+  GlobalKey<ScaffoldMessengerState>? messengerKey,
 }) {
   _persistentRequest?.cancel();
-  final messenger = $scaffoldMessengerKey.currentState;
+  final key = messengerKey ?? $scaffoldMessengerKey;
+  final messenger = key.currentState;
   if (messenger == null) {
     context.read<Logger?>()?.log(
       const SnackBarShowFailed(reason: 'The global ScaffoldMessenger is null'),
@@ -103,6 +110,7 @@ VoidCallback showPersistentSnackBar({
   late final _PersistentSnackBarRequest request;
   request = _PersistentSnackBarRequest(
     messenger: messenger,
+    messengerKey: key,
     textContent: textContent,
     actionLabel: actionLabel,
     onActionPressed: onActionPressed,
@@ -125,7 +133,8 @@ VoidCallback showPersistentSnackBar({
 /// suspended and remains eligible for later authoritative revalidation. If the
 /// global messenger is unavailable, or an ordinary exception prevents
 /// display, the failure is logged through the injected [Logger]. Flutter
-/// contract errors and assertions remain visible.
+/// contract errors and assertions remain visible. [messengerKey] confines
+/// feedback to an explicitly owned messenger when supplied.
 void showSnackBar({
   required BuildContext context,
   required String textContent,
@@ -133,8 +142,9 @@ void showSnackBar({
   SnackBarAction? action,
   SnackBarDuration duration = SnackBarDuration.medium,
   bool replaceCurrent = false,
+  GlobalKey<ScaffoldMessengerState>? messengerKey,
 }) {
-  final globalMessenger = $scaffoldMessengerKey.currentState;
+  final globalMessenger = (messengerKey ?? $scaffoldMessengerKey).currentState;
 
   if (globalMessenger == null) {
     context.read<Logger?>()?.log(
@@ -183,7 +193,8 @@ void showSnackBar({
 
 void _bindMessenger(ScaffoldMessengerState messenger) {
   final request = _persistentRequest;
-  if (request != null && !identical(request.messenger, messenger)) {
+  if (request != null &&
+      !identical(request.messengerKey.currentState, request.messenger)) {
     request.cancel();
   }
   if (!identical(_ordinarySnackBarMessenger, messenger)) {
@@ -192,7 +203,9 @@ void _bindMessenger(ScaffoldMessengerState messenger) {
     _ordinarySnackBarMessenger = messenger;
   }
   final closing = _persistentCloseTail;
-  if (closing != null && !identical(closing.messenger, messenger)) {
+  if (closing != null &&
+      !identical(closing.messenger, messenger) &&
+      !identical(closing.messenger, _persistentRequest?.messenger)) {
     _persistentCloseTail = null;
   }
 }
@@ -231,7 +244,7 @@ void _resumePersistentRequest(_PersistentSnackBarRequest request) {
     );
     return;
   }
-  final messenger = $scaffoldMessengerKey.currentState;
+  final messenger = request.messengerKey.currentState;
   if (messenger == null || !identical(messenger, request.messenger)) {
     request.cancel();
     return;
@@ -267,7 +280,7 @@ void _resumePersistentRequest(_PersistentSnackBarRequest request) {
           _resumePersistentRequest(request);
           return;
         }
-        if (!identical($scaffoldMessengerKey.currentState, request.messenger)) {
+        if (!identical(request.messengerKey.currentState, request.messenger)) {
           request
             ..validating = false
             ..cancel();
@@ -285,7 +298,7 @@ void _resumePersistentRequest(_PersistentSnackBarRequest request) {
             return;
           }
           if (!identical(
-            $scaffoldMessengerKey.currentState,
+            request.messengerKey.currentState,
             request.messenger,
           )) {
             request
@@ -310,6 +323,7 @@ void _resumePersistentRequest(_PersistentSnackBarRequest request) {
 final class _PersistentSnackBarRequest {
   _PersistentSnackBarRequest({
     required this.messenger,
+    required this.messengerKey,
     required this.textContent,
     required this.actionLabel,
     required this.onActionPressed,
@@ -318,6 +332,7 @@ final class _PersistentSnackBarRequest {
   });
 
   final ScaffoldMessengerState messenger;
+  final GlobalKey<ScaffoldMessengerState> messengerKey;
   final String textContent;
   final String actionLabel;
   final VoidCallback onActionPressed;
@@ -339,7 +354,7 @@ final class _PersistentSnackBarRequest {
           onPressed: () {
             if (canceled ||
                 !identical(_persistentRequest, this) ||
-                !identical($scaffoldMessengerKey.currentState, messenger)) {
+                !identical(messengerKey.currentState, messenger)) {
               return;
             }
             onActionPressed();
@@ -366,8 +381,7 @@ final class _PersistentSnackBarRequest {
   void suspend() {
     final current = controller;
     controller = null;
-    if (current != null &&
-        identical($scaffoldMessengerKey.currentState, messenger)) {
+    if (current != null && identical(messengerKey.currentState, messenger)) {
       final closing = current.closed.then<void>((_) {});
       _persistentCloseTail = _PersistentCloseTail(messenger, closing);
       current.close();
@@ -389,8 +403,7 @@ final class _PersistentSnackBarRequest {
     final current = controller;
     controller = null;
     if (identical(_persistentRequest, this)) _persistentRequest = null;
-    if (current != null &&
-        identical($scaffoldMessengerKey.currentState, messenger)) {
+    if (current != null && identical(messengerKey.currentState, messenger)) {
       _persistentCloseTail = _PersistentCloseTail(
         messenger,
         current.closed.then<void>((_) {}),

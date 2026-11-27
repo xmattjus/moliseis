@@ -11,6 +11,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// Credentials for the staff login form.
 typedef AdminLoginCredentials = ({String email, String password});
 
+/// The identity of one continuous interval of observed Admin access.
+final class AdminAuthority {
+  AdminAuthority._(this.accountId);
+
+  /// Account that was authorized when this interval began.
+  final String accountId;
+}
+
 /// Staff authentication state for the admin area.
 ///
 /// Not user management: it only observes the Supabase Auth session,
@@ -41,7 +49,7 @@ class AdminAuthViewModel extends ChangeNotifier {
       command.results.addListener(forward);
       command.isRunningSync.addListener(forward);
     }
-    _currentUser = _authClient.currentUser;
+    _setUser(_authClient.currentUser);
     _subscription = _authClient.onAuthStateChange.listen(
       _handleAuthStateChange,
       onError: _handleAuthStreamError,
@@ -52,6 +60,8 @@ class AdminAuthViewModel extends ChangeNotifier {
   final Logger _logger;
   late final StreamSubscription<AuthState> _subscription;
   User? _currentUser;
+  AdminAuthority? _authority;
+  bool _awaitingCurrentObservation = false;
   bool _disposed = false;
 
   late final ResultCommand<void, void> _loginCommand;
@@ -175,13 +185,11 @@ class AdminAuthViewModel extends ChangeNotifier {
   /// Whether the current session is anonymous or absent.
   bool get isAnonymous => _currentUser?.isAnonymous ?? true;
 
+  /// Current access interval, replaced even when the same account reauthorizes.
+  AdminAuthority? get authority => _authority;
+
   /// Whether the current session belongs to an authenticated staff account.
-  bool get isAdmin {
-    final currentUser = _currentUser;
-    return currentUser != null &&
-        !currentUser.isAnonymous &&
-        currentUser.appMetadata['admin'] == true;
-  }
+  bool get isAdmin => _authority != null;
 
   /// The current user's e-mail address, when Supabase provides one.
   String? get email => _currentUser?.email;
@@ -212,7 +220,7 @@ class AdminAuthViewModel extends ChangeNotifier {
       return Result.error(error);
     }
     if (_disposed) return _unavailable();
-    _syncUser();
+    _syncUser(confirmedLogin: _correlated(response));
     if (!_correlated(response)) {
       _syncUser();
       return _unavailable();
@@ -298,29 +306,51 @@ class AdminAuthViewModel extends ChangeNotifier {
     );
   }
 
-  void _syncUser() {
+  void _syncUser({bool confirmedLogin = false}) {
+    final live = _authClient.currentUser;
+    if (_awaitingCurrentObservation && _isAdmin(live) && !confirmedLogin) {
+      return;
+    }
+    if (confirmedLogin) _awaitingCurrentObservation = false;
+    _setUser(live);
+  }
+
+  static String? _adminAccount(User? user) => _isAdmin(user) ? user!.id : null;
+
+  void _setUser(User? user) {
     if (_disposed) return;
-    final user = _authClient.currentUser;
     final previous = _currentUser;
+    final account = _adminAccount(user);
+    final authorityChanged = account != _authority?.accountId;
     final changed =
+        authorityChanged ||
         user?.id != previous?.id ||
         user?.email != previous?.email ||
         user?.isAnonymous != previous?.isAnonymous ||
-        user?.appMetadata['admin'] != previous?.appMetadata['admin'] ||
         user?.userMetadata?['name'] != previous?.userMetadata?['name'];
     _currentUser = user;
+    if (authorityChanged) {
+      _authority = account == null ? null : AdminAuthority._(account);
+    }
     if (changed) notifyListeners();
   }
 
-  void _handleAuthStateChange(AuthState _) {
-    _syncUser();
+  void _handleAuthStateChange(AuthState observation) {
+    final live = _authClient.currentUser;
+    final observed = observation.event == AuthChangeEvent.signedOut
+        ? null
+        : observation.session?.user;
+    // GoTrue queues snapshots and may have already installed a later user.
+    // An old observation can end continuity but cannot grant the live account.
+    _awaitingCurrentObservation =
+        _adminAccount(observed) != _adminAccount(live);
+    _setUser(_awaitingCurrentObservation ? null : live);
   }
 
   void _handleAuthStreamError(Object error, StackTrace stackTrace) {
     if (_disposed) return;
-    // A failed authority stream cannot keep publishing private editor state.
-    _currentUser = null;
-    notifyListeners();
+    _awaitingCurrentObservation = true;
+    _setUser(null);
     _logger.log(
       const AdminAuthStateError(),
       error: error,
@@ -332,6 +362,7 @@ class AdminAuthViewModel extends ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _authority = null;
     _credentials = null;
     for (final command in _commands) {
       final forward = _publicObservers.remove(command)!;

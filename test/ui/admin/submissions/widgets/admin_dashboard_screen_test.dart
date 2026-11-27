@@ -184,6 +184,160 @@ void main() {
     });
 
     testOwnerUI(
+      'D1 retired retained Dashboard hides protected content, menu and '
+      'semantics and rejects captured callbacks before reconciliation',
+      (tester) async {
+        tester.view
+          ..physicalSize = const Size(390, 844)
+          ..devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final semantics = tester.ensureSemantics();
+        repository
+          ..listResult = Result.success([
+            sampleAdminSubmission(name: 'PRIVATE_SUBMISSION_SENTINEL'),
+          ])
+          ..ignoredSourcesResult = const Result.success([
+            AdminIgnoredSource(
+              id: 12,
+              provider: 'eventimolise',
+              externalId: 'private-source',
+              name: 'PRIVATE_SOURCE_SENTINEL',
+              ignoredAt: '2026-10-02T10:00:00Z',
+            ),
+          ]);
+        final initial = viewModel.refreshSubmissions();
+        await pumpCommandTurns(tester);
+        await initial;
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final route = ModalRoute.of(
+          tester.element(find.byType(AdminDashboardScreen)),
+        )!;
+        final newEditor = tester
+            .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+            .onPressed!;
+        final filter = tester
+            .widget<ToggleButtons>(find.byType(ToggleButtons))
+            .onPressed!;
+        filter(4);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('PRIVATE_SOURCE_SENTINEL').hitTestable(),
+          findsOneWidget,
+        );
+        final reactivate = tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Riattiva fonte'),
+            )
+            .onPressed!;
+        await tester.tap(find.byTooltip('Altro'));
+        await tester.pumpAndSettle();
+        expect(find.text('Aggiorna'), findsOneWidget);
+        expect(
+          find.bySemanticsLabel(RegExp('PRIVATE_SOURCE_SENTINEL')),
+          findsOneWidget,
+        );
+        final menuRefresh = tester
+            .widget<MenuItemButton>(
+              find.widgetWithText(MenuItemButton, 'Aggiorna'),
+            )
+            .onPressed!;
+        final before = List.of(repository.dashboardCalls);
+        auth
+          ..setUser(makeAuthUser(id: 'replacement-admin', isAdmin: true))
+          ..emit(AuthChangeEvent.signedIn);
+        await tester.idle();
+        reactivate();
+        filter(4);
+        newEditor();
+        menuRefresh();
+        expect(repository.dashboardCalls, before);
+        expect(router.state.name, RouteNames.adminDashboard);
+        expect(viewModel.items, isEmpty);
+        expect(viewModel.ignoredSources, isEmpty);
+        await tester.pump();
+        expect(route.isCurrent, isTrue);
+        expect(route.isActive, isTrue);
+        expect(
+          find.text('PRIVATE_SOURCE_SENTINEL', skipOffstage: false),
+          findsNothing,
+        );
+        expect(
+          find.text('PRIVATE_SUBMISSION_SENTINEL', skipOffstage: false),
+          findsNothing,
+        );
+        expect(find.text('Aggiorna', skipOffstage: false), findsNothing);
+        expect(find.byType(ToggleButtons, skipOffstage: false), findsNothing);
+        expect(
+          find.byType(FloatingActionButton, skipOffstage: false),
+          findsNothing,
+        );
+        expect(find.bySemanticsLabel('PRIVATE_SOURCE_SENTINEL'), findsNothing);
+        expect(
+          find.bySemanticsLabel('PRIVATE_SUBMISSION_SENTINEL'),
+          findsNothing,
+        );
+        await pumpCommandTurns(tester);
+        expect(repository.dashboardCalls, before);
+        expect(tester.takeException(), isNull);
+        semantics.dispose();
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+
+    testOwnerUI(
+      'D1 revocation removes Dashboard error feedback and preserves '
+      'unrelated app feedback',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp.router(
+            scaffoldMessengerKey: $scaffoldMessengerKey,
+            routerConfig: router,
+          ),
+        );
+        await tester.pumpAndSettle();
+        repository.listResult = Result.error(
+          TestException('synthetic failure'),
+        );
+        await tester.tap(find.byTooltip('Aggiorna i contenuti'));
+        await pumpCommandTurns(tester);
+        await tester.pumpAndSettle();
+        const privateFeedback =
+            "Si è verificato un errore durante l'aggiornamento dei contenuti";
+        expect(find.text(privateFeedback), findsOneWidget);
+        showSnackBar(
+          context: tester.element(find.byType(AdminDashboardScreen)),
+          textContent: 'PUBLIC_FEEDBACK_SENTINEL',
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('PUBLIC_FEEDBACK_SENTINEL'), findsOneWidget);
+        auth
+          ..setUser(null)
+          ..emit(AuthChangeEvent.signedOut);
+        await tester.idle();
+        await tester.pump();
+        expect(find.text(privateFeedback, skipOffstage: false), findsNothing);
+        router.goNamed(RouteNames.home);
+        await tester.pumpAndSettle();
+        expect(find.text('PUBLIC_FEEDBACK_SENTINEL'), findsOneWidget);
+        expect(find.text(privateFeedback, skipOffstage: false), findsNothing);
+      },
+      disposeOwners: () {
+        viewModel.dispose();
+        auth.dispose();
+      },
+    );
+
+    testOwnerUI(
       'ignored source without pending can be reactivated and returned '
       'proposal opened',
       (tester) async {

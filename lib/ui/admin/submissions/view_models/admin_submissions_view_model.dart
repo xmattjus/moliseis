@@ -7,6 +7,7 @@ import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/admin_submission_status.dart';
 import 'package:moliseis/domain/repositories/admin_content_submission_repository.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 
@@ -111,11 +112,13 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   /// Creates the submissions dashboard state backed by [repository].
   AdminSubmissionsViewModel({
     required AdminContentSubmissionRepository repository,
+    AdminAuthViewModel? auth,
+    AdminAuthority? authority,
   }) : _repository = repository {
     _load = createResultCommandNoParam(() async {
       final execution = _submissionRead!;
       try {
-        if (_disposed) return _unavailable<List<AdminSubmission>>();
+        if (_inactive) return _unavailable<List<AdminSubmission>>();
         return await _repository.list();
       } finally {
         _actionSettled(execution);
@@ -124,7 +127,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     _loadIgnored = createResultCommandNoParam(() async {
       final execution = _ignoredRead!;
       try {
-        if (_disposed) return _unavailable<List<AdminIgnoredSource>>();
+        if (_inactive) return _unavailable<List<AdminIgnoredSource>>();
         return await _repository.listIgnoredSources();
       } finally {
         _actionSettled(execution);
@@ -133,7 +136,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     _unIgnore = createResultCommand<int, AdminEventResolution>((id) async {
       final execution = _mutation!;
       try {
-        if (_disposed) return _unavailable<AdminEventResolution>();
+        if (_inactive) return _unavailable<AdminEventResolution>();
         return await _repository.unIgnoreSource(id);
       } finally {
         _actionSettled(execution);
@@ -145,6 +148,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     _observe(_load, () => _submissionRead, _forwardSubmissions);
     _observe(_loadIgnored, () => _ignoredRead, _forwardIgnored);
     _observe(_unIgnore, () => _mutation, _forwardMutation);
+    if (auth != null) _bindAuth(auth, authority ?? auth.authority);
   }
 
   final AdminContentSubmissionRepository _repository;
@@ -168,60 +172,117 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   AdminSubmissionStatus? _filter;
   bool _showIgnored = false;
   bool _disposed = false;
+  bool _retired = false;
+  AdminAuthViewModel? _auth;
+  AdminAuthority? _authority;
   bool _postCommit = false;
   int? _unignoredPendingId;
 
-  /// Last forwarded submissions outcome, frozen after revocation.
+  bool get _authorityEnded =>
+      _retired ||
+      (_auth != null &&
+          (_authority == null || !identical(_auth!.authority, _authority)));
+  bool get _inactive => _disposed || _authorityEnded;
+
+  /// Binds this owner once to the continuous authority that admitted its visit.
+  ///
+  /// Standalone presentations bind before rendering. Route providers bind in
+  /// the constructor before their initial read can be reserved.
+  void bindAuth(AdminAuthViewModel auth) => _bindAuth(auth, auth.authority);
+
+  void _bindAuth(AdminAuthViewModel auth, AdminAuthority? authority) {
+    if (_disposed || _retired || identical(_auth, auth)) return;
+    if (_auth != null) {
+      _retire();
+      return;
+    }
+    _auth = auth;
+    _authority = authority;
+    auth.addListener(_authChanged);
+    _authChanged();
+  }
+
+  void _authChanged() {
+    if (_authorityEnded) _retire();
+  }
+
+  void _retire() {
+    if (_disposed || _retired) return;
+    _retired = true;
+    _auth?.removeListener(_authChanged);
+    _items.clear();
+    _ignoredSources.clear();
+    _filter = null;
+    _showIgnored = false;
+    _unignoredPendingId = null;
+    _loadSnapshot = const commands.CommandResult.blank();
+    _loadIgnoredSnapshot = const commands.CommandResult.blank();
+    _unIgnoreSnapshot = const commands.CommandResult.blank();
+    for (final remove in _removePublic) {
+      remove();
+    }
+    _removePublic.clear();
+    notifyListeners();
+    _scheduleRelease();
+  }
+
+  /// Last forwarded submissions outcome, cleared when authority ends.
   commands.CommandResult<void, Result<List<AdminSubmission>>?>
-  get loadSnapshot => _loadSnapshot;
+  get loadSnapshot =>
+      _authorityEnded ? const commands.CommandResult.blank() : _loadSnapshot;
 
   /// Last forwarded ignored-source outcome, independent of submissions.
   commands.CommandResult<void, Result<List<AdminIgnoredSource>>?>
-  get loadIgnoredSnapshot => _loadIgnoredSnapshot;
+  get loadIgnoredSnapshot => _authorityEnded
+      ? const commands.CommandResult.blank()
+      : _loadIgnoredSnapshot;
 
   /// Reactivation stays logically running through both post-commit reads.
   commands.CommandResult<int?, Result<AdminEventResolution>?>
-  get unIgnoreSnapshot => _unIgnoreSnapshot;
+  get unIgnoreSnapshot => _authorityEnded
+      ? const commands.CommandResult.blank()
+      : _unIgnoreSnapshot;
 
   /// Whether this route owner has revoked publication and admission.
-  bool get isDisposed => _disposed;
+  bool get isDisposed => _inactive;
 
   /// Whether a reactivation or its coordinated refresh is reserved.
-  bool get isUnIgnoring => !_disposed && _mutation != null;
+  bool get isUnIgnoring => !_inactive && _mutation != null;
 
   /// Whether reactivation can reserve both idle read lanes immediately.
   bool get canUnIgnore =>
-      !_disposed &&
+      !_inactive &&
       _mutation == null &&
       _submissionRead == null &&
       _ignoredRead == null;
 
   /// Whether the committed revision is safe to open after both refreshes.
   bool get canOpenPendingSubmission =>
-      !_disposed &&
+      !_inactive &&
       _mutation == null &&
       _unIgnoreSnapshot.completed &&
       _unignoredPendingId != null;
 
   /// Public revision ID, withheld until coordinated refresh settlement.
-  int? get unignoredPendingId => _unignoredPendingId;
+  int? get unignoredPendingId => _authorityEnded ? null : _unignoredPendingId;
 
   /// All loaded submission summaries, before filtering.
   UnmodifiableListView<AdminSubmission> get items =>
-      UnmodifiableListView(_items);
+      UnmodifiableListView(_authorityEnded ? const [] : _items);
 
   /// Last successfully loaded ignored sources, retained on refresh failure.
   UnmodifiableListView<AdminIgnoredSource> get ignoredSources =>
-      UnmodifiableListView(_ignoredSources);
+      UnmodifiableListView(_authorityEnded ? const [] : _ignoredSources);
 
   /// Whether the ignored-source filter is selected.
-  bool get showIgnored => _showIgnored;
+  bool get showIgnored => !_authorityEnded && _showIgnored;
 
   /// The active status filter, where null represents all submissions.
-  AdminSubmissionStatus? get filter => _filter;
+  AdminSubmissionStatus? get filter => _authorityEnded ? null : _filter;
 
   /// Loaded summaries matching the current local filter.
   List<AdminSubmission> get filteredItems {
+    if (_authorityEnded) return const [];
     final filter = _filter;
     return filter == null
         ? items
@@ -229,24 +290,24 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   }
 
   /// Whether a submissions read remains reserved through safe settlement.
-  bool get loading => !_disposed && _submissionRead != null;
+  bool get loading => !_inactive && _submissionRead != null;
 
   /// Whether the last submissions read failed in either error channel.
-  bool get error => _loadSnapshot.hasFailure;
+  bool get error => loadSnapshot.hasFailure;
 
   /// Whether at least one submission has been loaded.
-  bool get hasData => _items.isNotEmpty;
+  bool get hasData => !_authorityEnded && _items.isNotEmpty;
 
   /// Updates selection without admitting remote work.
   void setIgnoredFilter() {
-    if (_disposed) return;
+    if (_inactive) return;
     _showIgnored = true;
     notifyListeners();
   }
 
   /// Updates the local status filter without reloading.
   void setFilter(AdminSubmissionStatus? status) {
-    if (_disposed) return;
+    if (_inactive) return;
     _showIgnored = false;
     _filter = status;
     notifyListeners();
@@ -283,14 +344,14 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   /// Manual refresh can recover stale rows. Assertions have no normal terminal
   /// snapshot and must not permit a subsequent ignored-source read.
   Future<void> refreshAfterEditorChange() async {
-    if (_disposed) return;
+    if (_inactive) return;
     await refreshSubmissions();
-    if (_disposed || _loadSnapshot.isRunning || _loadSnapshot.idle) return;
+    if (_inactive || _loadSnapshot.isRunning || _loadSnapshot.idle) return;
     if (_showIgnored) await refreshIgnoredSources();
   }
 
   bool _canRead(Object? token) =>
-      !_disposed &&
+      !_inactive &&
       (_mutation == null || (_postCommit && identical(token, _mutation)));
 
   _AdminExecution<void, List<AdminSubmission>>? _startSubmissions([
@@ -331,7 +392,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   }
 
   void _run<P, T>(_AdminExecution<P, T> execution, [P? parameter]) {
-    if (_disposed) {
+    if (_inactive) {
       execution.actionSettled = true;
       _scheduleSettlement(execution);
       return;
@@ -374,7 +435,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   }
 
   void _forwardSubmissions() {
-    if (_disposed) return;
+    if (_inactive) return;
     _loadSnapshot = _load.results.value;
     if (_loadSnapshot.data case Success<List<AdminSubmission>>(:final value)) {
       _items
@@ -385,7 +446,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   }
 
   void _forwardIgnored() {
-    if (_disposed) return;
+    if (_inactive) return;
     _loadIgnoredSnapshot = _loadIgnored.results.value;
     if (_loadIgnoredSnapshot.data case Success<List<AdminIgnoredSource>>(
       :final value,
@@ -398,7 +459,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   }
 
   void _forwardMutation() {
-    if (_disposed) return;
+    if (_inactive) return;
     final snapshot = _unIgnore.results.value;
     if (snapshot.completed) {
       _postCommit = true;
@@ -445,18 +506,18 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     if (execution.settled) return;
     execution
       ..settled = true
-      ..revoked = _disposed;
+      ..revoked = _inactive;
     if (identical(_submissionRead, execution)) _submissionRead = null;
     if (identical(_ignoredRead, execution)) _ignoredRead = null;
     final mutation = identical(_mutation, execution);
     final continueMutation =
-        mutation && !_disposed && execution.terminal?.completed == true;
+        mutation && !_inactive && execution.terminal?.completed == true;
     if (mutation && !continueMutation) {
       _mutation = null;
       _postCommit = false;
     }
     execution.completion.complete();
-    if (_disposed) {
+    if (_inactive) {
       _release(execution.command);
       return;
     }
@@ -497,7 +558,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
   }
 
   bool _ownsMutation(_AdminExecution<int, AdminEventResolution> mutation) =>
-      !_disposed && identical(_mutation, mutation) && _postCommit;
+      !_inactive && identical(_mutation, mutation) && _postCommit;
 
   void _abortRefresh(_AdminExecution<int, AdminEventResolution> mutation) {
     if (!_ownsMutation(mutation)) return;
@@ -514,14 +575,7 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
     command.dispose();
   }
 
-  @override
-  void dispose() {
-    if (_disposed) return;
-    _disposed = true;
-    for (final remove in _removePublic) {
-      remove();
-    }
-    _removePublic.clear();
+  void _scheduleRelease() {
     // Even idle resources release outside synchronous owner/upstream dispatch.
     scheduleMicrotask(() {
       unawaited(
@@ -532,6 +586,18 @@ class AdminSubmissionsViewModel extends ChangeNotifier {
         }),
       );
     });
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _auth?.removeListener(_authChanged);
+    for (final remove in _removePublic) {
+      remove();
+    }
+    _removePublic.clear();
+    _scheduleRelease();
     scheduleMicrotask(super.dispose);
   }
 }

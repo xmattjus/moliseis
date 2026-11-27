@@ -191,6 +191,17 @@ final class AdminSubmissionExitPolicy {
     });
   }
 
+  /// Releases a retired visit's exit decision before replacement can enter.
+  void retireAuthority() {
+    _revokePresentation?.call();
+    _revokePresentation = null;
+    _pending = null;
+    _releaseReservation?.call();
+    _releaseReservation = null;
+    _moderationClose = null;
+    _retireDialog();
+  }
+
   /// Guards only incoming Admin identity changes and occupied exit decisions.
   FutureOr<OnEnterResult> onEnter(
     BuildContext context,
@@ -273,6 +284,10 @@ final class AdminSubmissionExitPolicy {
       if (review == null) return const Block.stop();
       releaseReservation = () => owner.endExitDecision(review!, notify: false);
       _releaseReservation = releaseReservation;
+      if (!identical(_pending, token) ||
+          !_authorized(owner, visit.activation)) {
+        return const Block.stop();
+      }
       final result = await context
           .read<AdminSubmissionDraftRepository>()
           .loadDraftBySession(accountId: account, sessionId: session);
@@ -490,7 +505,7 @@ final class AdminSubmissionExitPolicy {
         return true;
       }
       review = owner.beginExitDecision(activation);
-      if (review == null) return false;
+      if (review == null || !current()) return false;
       _releaseReservation = () => owner.endExitDecision(review!, notify: false);
       if (!owner.hasUncheckpointedChanges) {
         leaving = true;

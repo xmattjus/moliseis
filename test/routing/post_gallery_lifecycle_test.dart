@@ -65,9 +65,7 @@ void main() {
         expect(fixture.post, findsNothing);
         expect(visibility.value, isTrue);
 
-        fixture.auth
-          ..setUser(null)
-          ..emit(AuthChangeEvent.signedOut);
+        fixture.router.refresh();
         await tester.idle();
         final replacement = fixture.match;
         expect(replacement.pageKey, original.pageKey);
@@ -182,9 +180,7 @@ void main() {
         press = await tester.startGesture(tester.getCenter(back));
       }
 
-      fixture.auth
-        ..setUser(null)
-        ..emit(AuthChangeEvent.signedOut);
+      fixture.router.refresh();
       await tester.idle();
       final live = fixture.match;
       expect(live.pageKey, original.pageKey);

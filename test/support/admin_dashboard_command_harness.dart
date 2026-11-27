@@ -4,6 +4,7 @@ import 'package:command_it/command_it.dart';
 import 'package:flutter/foundation.dart';
 import 'package:moliseis/domain/models/admin_external_event.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
+import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submissions_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 
@@ -15,7 +16,11 @@ enum AdminDashboardLane { submissions, ignored, mutation }
 
 /// Keeps physical work distinct from the accepted public refresh Future.
 final class AdminDashboardCommandHarness {
-  AdminDashboardCommandHarness(this.lane, {required DisposalEventProbe probe}) {
+  AdminDashboardCommandHarness(
+    this.lane, {
+    required DisposalEventProbe probe,
+    AdminAuthViewModel? auth,
+  }) {
     repository = FakeAdminContentSubmissionRepository();
     switch (lane) {
       case AdminDashboardLane.submissions:
@@ -26,7 +31,7 @@ final class AdminDashboardCommandHarness {
         repository.pendingUnIgnore = mutation;
     }
     final start = probe.creations.length;
-    owner = AdminSubmissionsViewModel(repository: repository);
+    owner = AdminSubmissionsViewModel(repository: repository, auth: auth);
     owner.addListener(() => notifications++);
     resultNotifiers = probe.creations
         .skip(start)

@@ -19,7 +19,6 @@ import 'package:moliseis/ui/settings/view_models/theme_view_model.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
 
 import '../support/command_test_support.dart';
 import '../support/fake_repositories.dart';
@@ -122,9 +121,8 @@ void main() {
         router.routerDelegate.currentConfiguration.last as ImperativeRouteMatch;
     final back = find.byType(BackButton);
     final press = await tester.startGesture(tester.getCenter(back));
-    fixture.auth
-      ..setUser(null)
-      ..emit(AuthChangeEvent.signedOut);
+    // Force route reconciliation independently of public auth notifications.
+    router.refresh();
     await tester.idle();
     final live =
         router.routerDelegate.currentConfiguration.last as ImperativeRouteMatch;

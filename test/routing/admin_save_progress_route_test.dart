@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/domain/models/content_category.dart';
@@ -586,50 +587,72 @@ void main() {
     disposeOwners: () => harness.dispose(),
   );
 
-  testOwnerUI(
-    'auth revocation can leave running progress before HTTP settles',
-    (tester) async {
-      harness = AdminSaveRouteHarness();
-      harness.router.goNamed(RouteNames.adminSubmissionNew);
-      await tester.pumpWidget(harness.app());
-      await tester.pumpAndSettle();
-      final owner = harness.owner;
-      final activation = owner.activation;
-      owner
-        ..setCategory(ContentCategory.history, activation: activation)
-        ..setCity('Campobasso', activation: activation)
-        ..setName('Contributo di prova', activation: activation);
-      final gate = Completer<Result<AdminSubmission>>();
-      harness.repository.pendingCreate = gate;
-      expect(owner.requestSave(activation: activation), isTrue);
-      unawaited(
-        harness.router.pushNamed(
-          RouteNames.adminSubmissionSaveProgress,
-          queryParameters: {
-            'session': owner.sessionId,
-            'attempt': '${owner.saveExecutionId}',
-          },
-        ),
-      );
-      await pumpCommandTurns(tester);
-      await tester.pump(const Duration(milliseconds: 400));
-      harness.auth.setUser(null);
-      harness.auth.emit(AuthChangeEvent.signedOut);
-      await tester.pumpAndSettle();
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
-      gate.complete(
-        Result.success(
-          sampleAdminSubmission(
-            description: null,
-            modifiedAtToken: '2026-08-20T00:00:00.123456Z',
+  for (final cover in [false, true]) {
+    testOwnerUI(
+      'auth revocation leaves running Progress (uninstalled cover: $cover)',
+      (tester) async {
+        harness = AdminSaveRouteHarness();
+        harness.router.goNamed(RouteNames.adminSubmissionNew);
+        await tester.pumpWidget(harness.app());
+        await tester.pumpAndSettle();
+        final owner = harness.owner;
+        final activation = owner.activation;
+        owner
+          ..setCategory(ContentCategory.history, activation: activation)
+          ..setCity('Campobasso', activation: activation)
+          ..setName('Contributo di prova', activation: activation);
+        final gate = Completer<Result<AdminSubmission>>();
+        harness.repository.pendingCreate = gate;
+        expect(owner.requestSave(activation: activation), isTrue);
+        unawaited(
+          harness.router.pushNamed(
+            RouteNames.adminSubmissionSaveProgress,
+            queryParameters: {
+              'session': owner.sessionId,
+              'attempt': '${owner.saveExecutionId}',
+            },
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byType(AdminLoginScreen), findsOneWidget);
-      expect(owner.sessionId, isNull);
-    },
-    disposeOwners: () => harness.dispose(),
-  );
+        );
+        await pumpCommandTurns(tester);
+        await tester.pump(const Duration(milliseconds: 400));
+        final router = harness.router;
+        final progress = ModalRoute.of(
+          tester.element(find.byType(AdminSubmissionSaveProgressScreen)),
+        )!;
+        final navigator = router.routerDelegate.navigatorKey.currentState!;
+        final page = navigator.widget.pages.last;
+        expect(harness.repository.createInputs, hasLength(1));
+        if (cover) {
+          unawaited(router.push<void>(RoutePaths.admin));
+          await tester.idle();
+          final committed =
+              router.routerDelegate.currentConfiguration.last
+                  as ImperativeRouteMatch;
+          expect(committed.route.name, RouteNames.adminDashboard);
+          expect(progress.isCurrent, isTrue);
+          expect(navigator.widget.pages.last, same(page));
+        }
+        harness.auth.setUser(null);
+        harness.auth.emit(AuthChangeEvent.signedOut);
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(harness.router.state.uri.path, RoutePaths.adminLoginLocation);
+        expect(progress.isActive, isFalse);
+        expect(navigator.widget.pages, isNot(contains(page)));
+        expect(await tester.binding.handlePopRoute(), isFalse);
+        gate.complete(
+          Result.success(
+            sampleAdminSubmission(
+              description: null,
+              modifiedAtToken: '2026-08-20T00:00:00.123456Z',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byType(AdminLoginScreen), findsOneWidget);
+        expect(owner.sessionId, isNull);
+      },
+      disposeOwners: () => harness.dispose(),
+    );
+  }
 }

@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:moliseis/ui/admin/auth/view_models/admin_auth_view_model.dart';
@@ -7,9 +9,81 @@ import 'package:moliseis/utils/result_command.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../support/mock_gotrue_client.dart';
+import '../../../../support/mock_logger.dart';
 
 void main() {
   group('AdminAuthViewModel', () {
+    for (final interruption in ['replacement', 'anonymous', 'role revoked']) {
+      test(
+        'GoTrue queues $interruption before same-account recovery',
+        () async {
+          final client = GoTrueClient(autoRefreshToken: false);
+          addTearDown(client.dispose);
+          final a = makeAuthUser(id: 'a', isAdmin: true);
+          final next = switch (interruption) {
+            'replacement' => makeAuthUser(id: 'b', isAdmin: true),
+            'anonymous' => makeAuthUser(id: 'anonymous', isAnonymous: true),
+            _ => makeAuthUser(id: 'a'),
+          };
+          await client.setInitialSession(jsonEncode(makeAuthSession(a)));
+          final owner = AdminAuthViewModel(
+            authClient: client,
+            logger: MockLogger(),
+          );
+          addTearDown(owner.dispose);
+          await pumpEventQueue(times: 1);
+          final original = owner.authority;
+          final notifications = <AdminAuthority?>[];
+          owner.addListener(() => notifications.add(owner.authority));
+
+          final interrupted = client.setInitialSession(
+            jsonEncode(makeAuthSession(next)),
+          );
+          final recovered = client.setInitialSession(
+            jsonEncode(makeAuthSession(a)),
+          );
+          expect(client.currentUser?.id, 'a');
+          expect(owner.authority, same(original));
+          await Future.wait([interrupted, recovered]);
+          await pumpEventQueue(times: 1);
+
+          expect(notifications, [null, same(owner.authority)]);
+          expect(owner.authority?.accountId, 'a');
+          expect(owner.authority, isNot(same(original)));
+        },
+      );
+    }
+
+    test(
+      'error retires authority while profile and refresh preserve it',
+      () async {
+        final user = makeAuthUser(id: 'a', isAdmin: true);
+        final auth = ControllableAdminAuth(initialUser: user);
+        addTearDown(auth.dispose);
+        final original = auth.viewModel.authority;
+        auth
+          ..setUser(makeAuthUser(id: 'a', isAdmin: true, name: 'New profile'))
+          ..emit(AuthChangeEvent.userUpdated)
+          ..emit(AuthChangeEvent.tokenRefreshed);
+        await pumpEventQueue(times: 1);
+        expect(auth.viewModel.displayName, 'New profile');
+        expect(auth.viewModel.authority, same(original));
+
+        final notifications = <AdminAuthority?>[];
+        auth.viewModel.addListener(
+          () => notifications.add(auth.viewModel.authority),
+        );
+        auth.events.addError(
+          const AuthException('Synthetic auth stream error'),
+        );
+        auth.emit(AuthChangeEvent.tokenRefreshed);
+        await pumpEventQueue(times: 1);
+        expect(notifications, [null, same(auth.viewModel.authority)]);
+        expect(auth.viewModel.authority?.accountId, 'a');
+        expect(auth.viewModel.authority, isNot(same(original)));
+      },
+    );
+
     test('treats an anonymous user as non-admin', () {
       final auth = ControllableAdminAuth();
       addTearDown(auth.dispose);
