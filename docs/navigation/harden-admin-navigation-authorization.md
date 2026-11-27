@@ -3,7 +3,7 @@
 **Status — investigation required before the next public release.** The
 project owner retains the release decision after investigation and severity
 assessment. This work can proceed independently of
-[deferred route exits](../harden-deferred-route-exits/proposal.md).
+[deferred route exits](harden-deferred-route-exits.md).
 
 ## Demonstrated behavior
 

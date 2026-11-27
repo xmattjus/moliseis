@@ -37,6 +37,6 @@ Existing Admin routing and admission remain in place.
 
 The existing protected departure policies remain in force. Ordinary explicit
 Back qualifies its source before dispatch. Atomic completion of deferred
-exits is tracked in [Harden deferred route exits](../harden-deferred-route-exits/proposal.md).
+exits is tracked in [Harden deferred route exits](../../../../docs/navigation/harden-deferred-route-exits.md).
 Admin history after authorization changes is tracked separately in
-[Investigate and harden Admin navigation authorization](../harden-admin-navigation-authorization/proposal.md).
+[Investigate and harden Admin navigation authorization](../../../../docs/navigation/harden-admin-navigation-authorization.md).

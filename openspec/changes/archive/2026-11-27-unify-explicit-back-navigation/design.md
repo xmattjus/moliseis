@@ -135,9 +135,9 @@ independent of navigation ownership.
   Dashboard-to-Explore replacement (F06). Restoring the original callback
   permits that replacement during reconciliation. The remaining duplicate
   completion and stale native dispatch cases are recorded in
-  [Harden deferred route exits](../harden-deferred-route-exits/proposal.md).
+  [Harden deferred route exits](../../../../docs/navigation/harden-deferred-route-exits.md).
   Retained Admin history after auth changes is a separate
-  [authorization investigation](../harden-admin-navigation-authorization/proposal.md).
+  [authorization investigation](../../../../docs/navigation/harden-admin-navigation-authorization.md).
 - **Dashboard.** Delegate only the terminal decision after account, visit,
   generation and recovery checks. A failed preflight consumes no authority.
   Keep the one-action latch and its resets after admitted dispatch. Earlier
@@ -151,7 +151,7 @@ independent of navigation ownership.
   lifecycle tests cover early and stranded results independently of Back
   input. Supported calls open a new Gallery or restore its serialized data.
   No in-place media reconciliation is needed for unsupported replacement.
-  [Gallery lifecycle evidence](../../../docs/performance/image-rendering-implementation.md#gallery-presentation-lifecycle-2026-11-25)
+  [Gallery lifecycle evidence](../../../../docs/performance/image-rendering-implementation.md#gallery-presentation-lifecycle-2026-11-25)
 - **Other features.** Admin Editor, Save Progress, Content Submission, Search
   Anchor, GeoMap, pickers, Logout and Close/Dismiss retain their actions,
   results, visibility and ownership. Ordinary Category, Post and Search
@@ -163,7 +163,7 @@ Verify tap, keyboard and semantics activation through the shared control and
 test router outcomes. A deterministic widget input interleaving can establish
 a real ordering issue without measuring field frequency. Keep simulated
 system Back and gesture tests separate from physical verification. NAV-01,
-physical Android predictive Back and physical interactive iOS Back remain open. Preserve the [iOS release gates](../../../docs/performance/image-rendering-implementation.md#ios-release-gates)
+physical Android predictive Back and physical interactive iOS Back remain open. Preserve the [iOS release gates](../../../../docs/performance/image-rendering-implementation.md#ios-release-gates)
 for genuine VoiceOver Nearby Retry activation and physical Profile memory,
 scrolling and raster checks, including the existing release-owner decision
 boundary. General router restoration and native route-reporting behavior

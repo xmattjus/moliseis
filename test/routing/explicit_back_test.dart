@@ -396,16 +396,40 @@ void main() {
     final source = tester.element(post);
     final route = ModalRoute.of(source)!;
     final back = tester.widget<BackButton>(find.byType(BackButton)).onPressed!;
-    showDialog<void>(
+    final root = router.configuration.navigatorKey.currentState!;
+    final enclosing = ModalRoute.of(route.navigator!.context)!;
+    final popup = DialogRoute<void>(
       context: source,
       builder: (_) => const AlertDialog(content: Text('Root popup')),
     );
-    await tester.pumpAndSettle();
-    final popup = ModalRoute.of(tester.element(find.text('Root popup')))!;
     final provider = router.routeInformationProvider;
     final beforePopupBack = provider.value;
     final popupConfiguration = router.routerDelegate.currentConfiguration;
+    root.push(popup);
+
+    // The branch PopScope still allows a pop until the next frame.
+    expect(enclosing.isCurrent, isFalse);
     expect(route.isCurrent, isTrue);
+    expect(route.popDisposition, RoutePopDisposition.pop);
+    expect(popup.isCurrent, isTrue);
+    back();
+    expect(
+      popup.isCurrent,
+      isTrue,
+      reason: 'Back must leave the root popup current.',
+    );
+    expect(popup.isActive, isTrue);
+    expect(popup.navigator, same(root));
+    expect(provider.value, same(beforePopupBack));
+    expect(
+      router.routerDelegate.currentConfiguration,
+      same(popupConfiguration),
+    );
+    expect(route.isActive, isTrue);
+    expect(route.isCurrent, isTrue);
+
+    await tester.pumpAndSettle();
+    expect(ModalRoute.of(tester.element(find.text('Root popup'))), same(popup));
     back();
     expect(popup.isCurrent, isTrue);
     expect(popup.isActive, isTrue);
@@ -415,8 +439,9 @@ void main() {
       same(popupConfiguration),
     );
     expect(router.state.uri.path, '/home/search_results/posts/1');
-    router.configuration.navigatorKey.currentState!.pop();
+    root.pop();
     await tester.pumpAndSettle();
+    expect(ModalRoute.of(tester.element(post)), same(route));
 
     unawaited(router.push<void>('/settings'));
     await tester.idle();
@@ -502,7 +527,9 @@ void main() {
       final router = fixture.router..go('/home/category/nature');
       await tester.pumpWidget(fixture.app);
       await tester.pumpAndSettle();
-      final back = leading ? find.byType(BackButton) : find.text('Indietro');
+      final back = leading
+          ? find.byType(BackButton)
+          : find.widgetWithText(FilledButton, 'Indietro');
 
       // The committed error Page can have no ordinary RouteMatch.
       router.go('/no-such-page');
@@ -523,7 +550,9 @@ void main() {
       expect(error, findsOneWidget);
       final errorState = tester.widget<RouteErrorScreen>(error);
       final source = tester.element(error);
-      final oldBack = errorState.onBack!;
+      final oldBack = leading
+          ? tester.widget<BackButton>(back).onPressed!
+          : tester.widget<FilledButton>(back).onPressed!;
       final errorRoute = ModalRoute.of(source)!;
       final original =
           router.routerDelegate.currentConfiguration.last
@@ -538,7 +567,7 @@ void main() {
       final provider = router.routeInformationProvider;
       final beforeCoveredBack = provider.value;
       final covered = router.routerDelegate.currentConfiguration;
-      oldBack(source);
+      oldBack();
       expect(popup.isCurrent, isTrue);
       expect(popup.isActive, isTrue);
       expect(provider.value, same(beforeCoveredBack));
@@ -566,7 +595,7 @@ void main() {
 
       provider.addListener(recordNotification);
       try {
-        oldBack(source);
+        oldBack();
         await tester.idle();
         expect(
           original.completer.isCompleted,
@@ -595,7 +624,7 @@ void main() {
         same(live.matches.error),
       );
       final afterReconciliation = provider.value;
-      oldBack(reconciled);
+      oldBack();
       expect(provider.value, same(afterReconciliation));
       expect(live.completer.isCompleted, isFalse);
       expect(errorRoute.isCurrent, isTrue);

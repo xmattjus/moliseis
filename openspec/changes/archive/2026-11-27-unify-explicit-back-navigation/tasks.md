@@ -22,6 +22,6 @@
 - [x] 4.4 Verify that both explicit diagnostic controls reject a committed but uninstalled cover and that explicit Back rejects an obsolete push after refresh. Verify a subsequent eligible single diagnostic departure. Remove the deferred-exit wrapper and verify legitimate declarative replacement during reconciliation.
 
 Deferred work from 4.1 and 4.3 is tracked in
-[Harden deferred route exits](../harden-deferred-route-exits/proposal.md).
-[Admin navigation authorization](../harden-admin-navigation-authorization/proposal.md)
+[Harden deferred route exits](../../../../docs/navigation/harden-deferred-route-exits.md).
+[Admin navigation authorization](../../../../docs/navigation/harden-admin-navigation-authorization.md)
 is a separate investigation.

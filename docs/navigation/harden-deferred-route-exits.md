@@ -3,7 +3,7 @@
 **Status — deferred pending a suitable upstream correction or another
 demonstrably proportionate solution.** This record carries forward task 4.1,
 task 4.3 and the “Diagnostic departures overlap” scenario from
-[unify-explicit-back-navigation](../unify-explicit-back-navigation/proposal.md).
+[unify-explicit-back-navigation](../../openspec/changes/archive/2026-11-27-unify-explicit-back-navigation/proposal.md).
 
 ## Dependency behavior and reproduction
 
@@ -72,7 +72,7 @@ router commits from Navigator reconciliation.
   mistook the legitimate stack replacement for a stale physical pop and
   left Settings committed. The restored callback permits a single nonempty
   Explore commit with both results pending and no exception. Keep that
-  regression in PR #50's active suite.
+  regression in the [Admin routing tests](../../test/routing/admin_route_test.dart).
 
 GoRouter 18.0.2 schedules physical-pop approval using the match associated
 with the installed Page and completes that captured match without rechecking
