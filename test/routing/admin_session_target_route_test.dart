@@ -42,14 +42,24 @@ void main() {
         final loadB = Completer<Result<AdminSubmissionDraft?>>();
         final lookups = <(String, String)>[];
         final reconciled = <AdminDraftOwner>[];
+        // Only A's own session and target can resolve A's draft.
         local.drafts.onLoadBySession = (account, session) {
           lookups.add((account, session));
-          return lookups.length == 1
-              ? lookup.future
-              : Future.value(Result.success(draft));
+          if (lookups.length == 1) return lookup.future;
+          return Future.value(
+            Result.success(
+              account == a && session == draft.owner.sessionId ? draft : null,
+            ),
+          );
         };
-        local.drafts.onLoad = (account, _) =>
-            account == b ? loadB.future : Future.value(Result.success(draft));
+        local.drafts.onLoad = (account, target) {
+          if (account == b) return loadB.future;
+          return Future.value(
+            Result.success(
+              account == a && target == draft.owner.submissionId ? draft : null,
+            ),
+          );
+        };
         local.staged.onReconcile = (owner) async {
           reconciled.add(owner);
           return Result.success(local.staged.assets[owner] ?? []);

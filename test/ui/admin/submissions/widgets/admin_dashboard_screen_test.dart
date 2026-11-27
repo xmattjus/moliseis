@@ -192,7 +192,6 @@ void main() {
           ..devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        final semantics = tester.ensureSemantics();
         repository
           ..listResult = Result.success([
             sampleAdminSubmission(name: 'PRIVATE_SUBMISSION_SENTINEL'),
@@ -286,7 +285,6 @@ void main() {
         await pumpCommandTurns(tester);
         expect(repository.dashboardCalls, before);
         expect(tester.takeException(), isNull);
-        semantics.dispose();
       },
       disposeOwners: () {
         viewModel.dispose();
@@ -302,16 +300,20 @@ void main() {
             MaterialApp.router(
               scaffoldMessengerKey: $scaffoldMessengerKey,
               routerConfig: router,
+              // The retired Dashboard removes its own Scaffold; keep a stable
+              // host so the shared messenger can present unrelated feedback.
+              builder: (_, child) => Scaffold(body: child),
             ),
           );
           await tester.pumpAndSettle();
-          final context = tester.element(find.byType(AdminDashboardScreen));
+          final dashboard = find.byType(AdminDashboardScreen);
+          final dashboardElement = tester.element(dashboard);
           const first = 'FIRST_PUBLIC_FEEDBACK';
           const last = 'LAST_PUBLIC_FEEDBACK';
           const dashboardError =
               "Si è verificato un errore durante l'aggiornamento dei contenuti";
           if (queued) {
-            showSnackBar(context: context, textContent: first);
+            showSnackBar(context: dashboardElement, textContent: first);
             await tester.pumpAndSettle();
           }
           repository.listResult = Result.error(
@@ -324,7 +326,7 @@ void main() {
             find.text(dashboardError),
             queued ? findsNothing : findsOneWidget,
           );
-          showSnackBar(context: context, textContent: last);
+          showSnackBar(context: dashboardElement, textContent: last);
           await tester.pumpAndSettle();
           expect(find.text(last), findsNothing);
 
@@ -335,8 +337,12 @@ void main() {
               ..emit(AuthChangeEvent.signedIn);
             await Future<void>.delayed(Duration.zero);
           });
-          router.goNamed(RouteNames.home);
-          await tester.pumpAndSettle();
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 250));
+
+          // Withdrawal comes from authority retirement, not disposal.
+          expect(tester.element(dashboard), same(dashboardElement));
+          expect(router.state.name, RouteNames.adminDashboard);
           expect(find.text(dashboardError, skipOffstage: false), findsNothing);
           if (queued) {
             expect(find.text(first), findsOneWidget);
@@ -344,11 +350,15 @@ void main() {
             $scaffoldMessengerKey.currentState!.hideCurrentSnackBar();
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 250));
+            // The queued Dashboard entry is skipped at the queue head.
             expect(find.text(dashboardError), findsNothing);
+            await tester.pumpAndSettle();
+          } else {
             await tester.pumpAndSettle();
           }
           expect(find.text(last), findsOneWidget);
           expect(find.text(dashboardError, skipOffstage: false), findsNothing);
+          expect(tester.element(dashboard), same(dashboardElement));
           clearAppSnackBars();
           await tester.pumpAndSettle();
           expect(find.byType(SnackBar), findsNothing);

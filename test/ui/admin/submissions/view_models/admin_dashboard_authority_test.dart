@@ -101,6 +101,13 @@ void main() {
         await tester.idle();
         expect(auth.viewModel.authority, isNot(same(originalAuthority)));
         expect(h.owner.canRefreshSelectedLane, isFalse);
+        // Retirement releases idle lanes at their deferred boundary; only the
+        // physically pending lane stays allocated until it settles.
+        await pumpPhysicalCommandDisposal(tester);
+        expect(h.resultNotifiers.map(probe.count).toList()..sort(), [
+          0,
+          for (var i = 1; i < h.resultNotifiers.length; i++) 1,
+        ]);
         final failure = StateError('late synthetic failure');
         switch (outcome) {
           case 'success':
@@ -128,8 +135,14 @@ void main() {
         expect(fresh.canRefreshSelectedLane, isTrue);
         expect(fresh.items, isEmpty);
         fresh.dispose();
+        // Late settlement released the pending lane before explicit disposal.
+        await pumpPhysicalCommandDisposal(tester);
+        for (final notifier in h.resultNotifiers) {
+          expect(probe.count(notifier), 1);
+        }
         h.owner.dispose();
         await pumpPhysicalCommandDisposal(tester);
+        // Explicit disposal does not release any lane a second time.
         for (final notifier in h.resultNotifiers) {
           expect(probe.count(notifier), 1);
         }
