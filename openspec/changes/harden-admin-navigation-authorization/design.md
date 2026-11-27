@@ -297,8 +297,16 @@ installing their matches. Committed Admin configuration must carry that
 parse's authority because the delegate can finish an already-approved exit
 after Flutter discards its old parser transaction. A late obsolete commit
 cannot admit private builders and triggers another bounded reconciliation.
-The declarative Dashboard Page rotates with authority. Existing imperative
-Pages retain their unique GoRouter keys. The exit policy releases old
+GoRouter 18.1.4's delegate skips structurally equal configurations, and
+its Navigator caches Pages against the last built match list. A Login
+configuration can commit without being built. Authority-driven entry and
+stale-restoration fallback therefore carry `_dashboardReplacement` in
+`RouteMatchList.extra`, which participates in equality. This invalidates
+the cache so the declarative Dashboard builder captures the new authority
+in its physical Page key. Imperative pushes allocate a fresh match key.
+Explicit Back allows the Dashboard's different physical key and still
+requires the exact installed Page and its current GoRouter state
+association. The exit policy releases old
 reservations and removes its exact dialog; Progress bypasses its exit veto
 when the committed configuration retires. Unrelated public auth events
 leave navigation untouched.
@@ -306,8 +314,12 @@ leave navigation untouched.
 GoRouter 18.1.4 compares the old and new route-match sequences and checks
 the exiting suffix after the first difference. Removing an Admin match
 beneath the public Content Submission form can therefore ask the same
-form to exit. The reconciliation restore carries the exact source and
-replacement configurations through the parser and delegate continuation.
+form to exit. The parser preserves the supplied restore list when matching resolves to
+the same URI. The reconciliation restore carries those exact source and
+replacement configurations into synchronous completion. The delegate's
+reverse-order exit walk can inspect the scoped restore during that
+completion. An asynchronous public decision keeps its existing exit
+ownership after the scope ends.
 The public exit policy accepts that callback only when the current
 retiring source and the approved replacement contain the identical
 imperative match for its Page key. The original form and any current
@@ -326,16 +338,20 @@ withdraw, suppresses retired content, and relinquishes removal authority
 when it closes or the queue resets. Unrelated entries retain their order
 and duration. The existing persistent recovery request keeps its selective
 cancellation, ordinary-tail suspension and authoritative revalidation.
-The Editor captures route
-authority before activation, with the existing draft session checking the
-captured authority at lookup and installation boundaries. Revocation clears
-runtime state and preserves the account-qualified durable checkpoint and
-assets.
+The Editor captures route authority before activation, and the draft session
+checks that authority at lookup and installation boundaries. Auth commits the
+new authority before synchronous listener delivery. Editor revocation advances
+both generations before late futures can settle, then clears runtime state
+while preserving the account-qualified durable checkpoint and assets. The
+authority predicate also protects the installation boundary during listener
+dispatch. The draft session retains the caller predicate alongside its own
+generation and owner checks.
 
 The Settings and Gallery reconciliation tests now trigger an explicit
 router refresh to preserve their stale Page and completer assertions.
-Unrelated public Auth events no longer induce that reparse. The existing
-replacement exit test waits for the new observed authority before making
+Unrelated public Auth events no longer induce that reparse. Public Gallery
+and dirty submission sign-out tests verify configuration identity and
+subsequent Back behavior. The existing replacement exit test waits for the new observed authority before making
 its fresh Editor request and keeps its original reservation assertions.
 
 ## Autonomous verification

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:moliseis/domain/models/admin_submission.dart';
 import 'package:moliseis/routing/admin_route_history.dart';
 import 'package:moliseis/routing/route_names.dart';
 import 'package:moliseis/routing/route_paths.dart';
@@ -16,11 +17,13 @@ import 'package:moliseis/ui/core/ui/unsaved_changes_dialog.dart';
 import 'package:moliseis/ui/explore/widgets/explore_screen.dart';
 import 'package:moliseis/ui/settings/widgets/settings_screen.dart';
 import 'package:moliseis/ui/sync/widgets/sync_screen.dart';
+import 'package:moliseis/utils/result.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../support/admin_draft_repositories.dart';
 import '../support/admin_save_route_harness.dart';
 import '../support/command_test_support.dart';
+import '../support/fake_repositories.dart';
 import '../support/mock_gotrue_client.dart';
 import '../support/sync_harness.dart';
 
@@ -146,6 +149,108 @@ void main() {
     },
     disposeOwners: () => harness.dispose(),
   );
+
+  for (final (accountId, publicAncestry, restore) in [
+    (AdminDraftSessionHarness.accountA, false, false),
+    (AdminDraftSessionHarness.accountB, false, false),
+    (AdminDraftSessionHarness.accountA, true, false),
+    (AdminDraftSessionHarness.accountB, true, false),
+    (AdminDraftSessionHarness.accountA, false, true),
+  ]) {
+    final ancestry = publicAncestry ? 'above Home' : 'at the root';
+    final request = restore ? ' with an intervening stale restore' : '';
+    testOwnerUI('Dashboard renders after rapid authority churn to $accountId '
+        '$ancestry$request', (tester) async {
+      harness = AdminSaveRouteHarness();
+      final router = harness.router as AdminRouteHistoryRouter;
+      final cached = Completer<Result<List<AdminSubmission>>>()
+        ..complete(Result.success([sampleAdminSubmission(id: 98)]));
+      harness.repository.pendingList = cached;
+      router.go(publicAncestry ? RoutePaths.home : RoutePaths.admin);
+      await tester.pumpWidget(harness.app());
+      await tester.pumpAndSettle();
+      if (publicAncestry) {
+        unawaited(router.push<void>(RoutePaths.admin));
+        await tester.pumpAndSettle();
+      }
+
+      final dashboard = find.byType(AdminDashboardScreen);
+      final oldOwner = tester.widget<AdminDashboardScreen>(dashboard).viewModel;
+      final oldRoute = ModalRoute.of(tester.element(dashboard))!;
+      expect(oldOwner.items.map((item) => item.id), [98]);
+      final oldAuthority = router.admittedAuthority!;
+      final oldConfiguration = router.routerDelegate.currentConfiguration;
+      final navigator = router.routerDelegate.navigatorKey.currentState!;
+      final oldPage = navigator.widget.pages.last;
+      final homePage = publicAncestry ? navigator.widget.pages.first : null;
+
+      final pending = Completer<Result<List<AdminSubmission>>>();
+      harness.repository.pendingList = pending;
+      final oldRead = oldOwner.refreshSubmissions();
+      await tester.idle();
+      expect(harness.repository.listCallCount, 2);
+      harness.repository.pendingList = null;
+
+      harness.auth
+        ..setUser(makeAuthUser(id: AdminDraftSessionHarness.accountA))
+        ..emit(AuthChangeEvent.userUpdated);
+      await tester.idle();
+      expect(router.admittedAuthority, isNull);
+      harness.auth
+        ..setUser(makeAuthUser(isAnonymous: true))
+        ..emit(AuthChangeEvent.signedIn);
+      await tester.idle();
+      expect(harness.auth.viewModel.authority, isNull);
+      void restoreOldConfiguration() => router.restore(oldConfiguration);
+      // Supersede the pending Login-to-Dashboard request during notification.
+      if (restore) harness.auth.viewModel.addListener(restoreOldConfiguration);
+      harness.auth
+        ..setUser(makeAuthUser(id: accountId, isAdmin: true))
+        ..emit(AuthChangeEvent.signedIn);
+      await tester.idle();
+      if (restore) {
+        harness.auth.viewModel.removeListener(restoreOldConfiguration);
+      }
+
+      expect(router.state.uri.path, RoutePaths.admin);
+      expect(router.admittedAuthority, same(harness.auth.viewModel.authority));
+      expect(router.admittedAuthority?.accountId, accountId);
+      expect(router.admittedAuthority, isNot(same(oldAuthority)));
+      // The original Page is still installed: no frame ran during churn.
+      expect(navigator.widget.pages.last, same(oldPage));
+      expect(oldOwner.items, isEmpty);
+      await oldOwner.refreshSubmissions();
+      expect(harness.repository.listCallCount, 2);
+
+      await tester.pumpAndSettle();
+      expect(dashboard.hitTestable(), findsOneWidget);
+      final newOwner = tester.widget<AdminDashboardScreen>(dashboard).viewModel;
+      expect(newOwner, isNot(same(oldOwner)));
+      expect(navigator.widget.pages.last, isNot(same(oldPage)));
+      expect(oldRoute.isActive, isFalse);
+      expect(harness.repository.listCallCount, 3);
+
+      pending.complete(Result.success([sampleAdminSubmission(id: 99)]));
+      await pumpCommandTurns(tester);
+      await oldRead;
+      await tester.pumpAndSettle();
+      expect(oldOwner.items, isEmpty);
+      expect(newOwner.items, isEmpty);
+      expect(harness.repository.listCallCount, 3);
+
+      if (publicAncestry) {
+        expect(navigator.widget.pages.first.key, homePage!.key);
+      }
+      expect(await tester.binding.handlePopRoute(), publicAncestry);
+      await tester.pumpAndSettle();
+      expect(
+        router.state.uri.path,
+        publicAncestry ? RoutePaths.home : RoutePaths.admin,
+      );
+      expect(dashboard, publicAncestry ? findsNothing : findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }, disposeOwners: () => harness.dispose());
+  }
 
   testOwnerUI(
     'authorized Admin push and Back retain the original Dashboard route',

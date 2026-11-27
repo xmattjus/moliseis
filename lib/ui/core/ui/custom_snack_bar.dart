@@ -218,8 +218,14 @@ void _withdrawRetiredSnackBar(
       identical(messenger, $scaffoldMessengerKey.currentState);
   void withdraw() {
     if (!retired.value) return;
-    // Leave the current build and let a native dismissal report closure
-    // before removing the head. Keep queued retired content out of the frame.
+    // The first hop leaves the current build and lets a same-turn native
+    // dismissal finish. The second lets its closed Future invalidate ownership
+    // before removal, while still withdrawing before the next frame.
+    // This helper owns app-driven queue mutations. A direct hide, remove,
+    // controller close or clear can change the head without updating our
+    // ownership records. In particular, a native removal queued between these
+    // hops can move the head ahead of its closed callback. Implement future
+    // removal and clearing here, coordinating the tail and reset generation.
     scheduleMicrotask(() {
       scheduleMicrotask(() {
         if (ownsHead()) messenger.removeCurrentSnackBar();

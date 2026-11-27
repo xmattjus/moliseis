@@ -271,6 +271,53 @@ void main() {
     );
   }
 
+  testOwnerUI('sign-out preserves a dirty form on wholly public history', (
+    tester,
+  ) async {
+    final admin = AdminSaveRouteHarness();
+    ownerDisposals.add(admin.dispose);
+    final public = createHarness();
+    final router = admin.router;
+    await tester.pumpWidget(
+      ChangeNotifierProvider<ContentSubmissionViewModel>.value(
+        value: public.viewModel,
+        child: admin.app(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    unawaited(router.push<void>(RoutePaths.contentSubmission));
+    await tester.pumpAndSettle();
+    final form = find.byType(ContentSubmissionScreen);
+    final route = ModalRoute.of(tester.element(form));
+    public.viewModel.setCity('Isernia');
+    await tester.pump();
+    final state = public.viewModel.state;
+    final configuration = router.routerDelegate.currentConfiguration;
+    final decision = find.text('Salvare le modifiche?');
+
+    expect(admin.auth.viewModel.isAdmin, isTrue);
+    admin.auth
+      ..setUser(null)
+      ..emit(AuthChangeEvent.signedOut);
+    await tester.pumpAndSettle();
+
+    expect(admin.auth.viewModel.isAdmin, isFalse);
+    expect(router.routerDelegate.currentConfiguration, same(configuration));
+    expect(ModalRoute.of(tester.element(form)), same(route));
+    expect(public.viewModel.state, same(state));
+    expect(public.viewModel.hasUnsavedChanges, isTrue);
+    expect(public.draftRepository.saveDraftCallCount, 0);
+    expect(decision, findsNothing);
+
+    expect(await tester.binding.handlePopRoute(), isTrue);
+    await tester.pumpAndSettle();
+    expect(decision, findsOneWidget);
+    await tester.tap(find.text('Esci senza salvare'));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, RoutePaths.home);
+    expect(tester.takeException(), isNull);
+  }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
+
   for (final (deciding, approve, refresh) in [
     (true, false, false),
     (true, true, false),

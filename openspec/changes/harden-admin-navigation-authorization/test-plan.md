@@ -78,6 +78,16 @@ paths only where existing coverage does not assert the changed boundary.
 | --- | --- | --- |
 | R1 | In Home → Admin → public form, retiring Admin opened a dirty-exit dialog or left Admin in installed history during submission or finalization. An already pending public go could also leave Admin beneath the open decision. The ordinary submit flow pushes Progress above the form as a separate match. | Assert the actual Navigator removes the obsolete Admin Page and keeps the original form, owner and match, and keeps the original Progress route during finalization. No security-triggered checkpoint, discard or exit dialog. Test genuine Back while dirty or submitting, and a pending public go before or during its decision, including approval and cancellation. |
 | R2 | Refresh errors could appear concurrently with unrelated app feedback or before an already-visible app message. | Exercise visible and queued Dashboard retirement with unrelated feedback before or after it. Check same-turn native dismissal, recovery revalidation after the surviving tail, and global clearing with a queued owned entry. Retain the existing Dashboard authority and DRAFT-11/DRAFT-12 regressions. |
+| R3 | Loss, anonymous sign-in and renewed Admin authority can commit without an intervening Navigator build. A stale restoration can also supersede the fresh landing request. | Exercise same-account and different-account admission at the root and above Home, plus the superseding restore. Require a rendered fresh owner, a fresh read, retirement of private state and work, and valid Back history. |
+| R4 | Sign-out on wholly public history should leave the router idle. | Verify Gallery configuration, route information, Page and Back history remain intact. Verify a dirty public submission keeps its state and the usual Back decision. |
+
+For a GoRouter upgrade, run `admin_authorization_history_test.dart`
+for Page replacement, public ancestry, pending commits and restoration,
+`content_submission_route_test.dart` for the scoped public restore and
+ordinary exit decisions, and `explicit_back_test.dart`, `admin_route_test.dart`
+and `post_gallery_lifecycle_test.dart` for explicit Back and imperative
+match reconciliation. Keep the original NAV-01 assertions enabled in
+`geo_map_route_test.dart`.
 
 ## Disposable Supabase runtime gate
 
@@ -144,7 +154,7 @@ Emulators, widgets and simulator coverage support diagnosis.
 | --- | --- |
 | Android Back | Exercise system/hardware Back and predictive Back commit and cancel, including while a cover is installing or authorization changes. Verify inactive shell branch retention, no obsolete Admin reveal and stable eligible Back behavior. |
 | iOS Back | Exercise swipe Back commit/cancel and explicit app-bar Back during ordinary and authority-driven departures. Confirm correct public ancestry and no reveal of retired content. |
-| Both platforms, transitions | Rotate and background/resume during navigation and auth change. Check protected pixels, accessibility focus and interaction during transition frames, with an active moderation or dirty dialog and in Save Progress while work is outstanding. Check that authorized exit protections still apply. |
+| Both platforms, transitions | Rotate and background/resume during navigation and auth change. Check protected pixels, accessibility focus and interaction during transition frames, with an active moderation or dirty dialog and in Save Progress while work is outstanding. Check that authorized exit protections still apply. Verify retired Snackbar withdrawal, unrelated feedback duration and accessible announcements. |
 | Both platforms, restart and account replacement | Restart with an A checkpoint and staged assets plus saved navigation state. Use B, verify A's editor and progress cannot resume, then return as A and recover the durable checkpoint and assets through a fresh visit. |
 
 Keep unresolved manual results in the linked navigation release record.

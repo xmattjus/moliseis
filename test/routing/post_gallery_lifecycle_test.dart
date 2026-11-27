@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/domain/models/event.dart';
+import 'package:moliseis/ui/admin/auth/widgets/admin_login_screen.dart';
 import 'package:moliseis/ui/admin/submissions/view_models/admin_submission_editor_view_model.dart';
 import 'package:moliseis/ui/admin/submissions/widgets/admin_submission_editor_screen.dart';
 import 'package:moliseis/ui/core/ui/cards/card_base.dart';
@@ -221,6 +222,50 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testOwnerUI('sign-out leaves a public Gallery and its Back history intact', (
+    tester,
+  ) async {
+    final fixture = await _PostGalleryFixture.mount(
+      tester,
+      auth: ControllableAdminAuth(initialUser: makeAuthUser(isAdmin: true)),
+    );
+    await fixture.makeReady();
+    final post = tester.state(fixture.post);
+    await fixture.tapPhoto();
+    await _frames(tester);
+    final gallery = tester.state(fixture.gallery);
+    final match = fixture.match;
+    final router = fixture.router;
+    final configuration = router.routerDelegate.currentConfiguration;
+    final information = router.routeInformationProvider.value;
+    var notified = false;
+    void onRouteInformation() => notified = true;
+    router.routeInformationProvider.addListener(onRouteInformation);
+
+    expect(fixture.auth.viewModel.isAdmin, isTrue);
+    fixture.auth
+      ..setUser(null)
+      ..emit(AuthChangeEvent.signedOut);
+    await tester.idle();
+    await _frames(tester);
+    router.routeInformationProvider.removeListener(onRouteInformation);
+
+    expect(fixture.auth.viewModel.isAdmin, isFalse);
+    expect(notified, isFalse);
+    expect(router.routeInformationProvider.value, same(information));
+    expect(router.routerDelegate.currentConfiguration, same(configuration));
+    expect(fixture.match, same(match));
+    expect(tester.state(fixture.gallery), same(gallery));
+    expect(find.byType(AdminLoginScreen), findsNothing);
+
+    await fixture.back();
+    await _frames(tester);
+    expect(fixture.gallery, findsNothing);
+    expect(tester.state(fixture.post), same(post));
+    expect(match.completer.isCompleted, isTrue);
+    expect(tester.takeException(), isNull);
+  });
 
   testOwnerUI('normal Gallery return survives coverage and unchanged auth', (
     tester,

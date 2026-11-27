@@ -57,6 +57,10 @@ final class AdminRouteHistoryRouter extends GoRouter {
   AdminAuthority? _authority;
   RouteMatchList? _retiring;
   bool _interrupted = false;
+  // GoRouter caches Pages by structural match-list equality, which includes
+  // extra. Login can commit without building, leaving the old Dashboard
+  // as the last built list. Distinguish authority-driven Dashboard entries
+  // so the page builder captures the fresh authority in its Page key.
   int _dashboardReplacement = 0;
   bool _validatingRestoredHistory = false;
   AdminAuthority? _configurationAuthority;
@@ -164,7 +168,11 @@ final class AdminRouteHistoryRouter extends GoRouter {
     }
     final top = _topUri(current);
     if (top.path == RoutePaths.adminLoginLocation && _auth.isAdmin) {
-      _navigateFrom(current.remove(current.last), Uri.parse(RoutePaths.admin));
+      _navigateFrom(
+        current.remove(current.last),
+        Uri.parse(RoutePaths.admin),
+        extra: ++_dashboardReplacement,
+      );
       return;
     }
     final target = _withoutAdminSyncReturn(top);
@@ -364,7 +372,10 @@ final class AdminRouteHistoryRouter extends GoRouter {
       }
       return prefix.isNotEmpty
           ? prefix
-          : configuration.findMatch(Uri.parse(_adminLanding));
+          : configuration.findMatch(
+              Uri.parse(_adminLanding),
+              extra: _auth.isAdmin ? ++_dashboardReplacement : null,
+            );
     }
     if (prefix.isEmpty) return configuration.findMatch(safeSync);
     if (_topUri(prefix) == safeSync) return prefix;
