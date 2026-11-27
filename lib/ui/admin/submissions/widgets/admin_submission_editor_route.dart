@@ -22,6 +22,7 @@ class AdminSubmissionEditorRoute extends StatefulWidget {
   const AdminSubmissionEditorRoute({
     required this.viewModel,
     required this.auth,
+    required this.authority,
     this.submissionId,
     this.sessionId,
     this.child,
@@ -32,6 +33,9 @@ class AdminSubmissionEditorRoute extends StatefulWidget {
 
   final AdminSubmissionEditorViewModel viewModel;
   final AdminAuthViewModel auth;
+
+  /// Authority that admitted this route, captured before any provider lookup.
+  final AdminAuthority? authority;
   final int? submissionId;
   final String? sessionId;
 
@@ -62,6 +66,11 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
     unawaited(_activate());
   }
 
+  late final AdminAuthority? _authority;
+
+  bool get _hasAuthority =>
+      _authority != null && identical(_authority, widget.auth.authority);
+
   var _binding = 0;
   var _ready = false;
   Exception? _error;
@@ -76,6 +85,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
   @override
   void initState() {
     super.initState();
+    _authority = widget.authority;
     _exitPolicy = widget.exitPolicy;
     widget.auth.addListener(_authChanged);
     widget.viewModel.addListener(_ownerChanged);
@@ -139,7 +149,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
   }
 
   void _ownerChanged() {
-    if (!mounted || !_ready) return;
+    if (!mounted || !_hasAuthority || !_ready) return;
     final owner = widget.viewModel;
     if (owner.isActivationCurrent(_activation)) {
       if (owner.hasDurableDraft) _restoredSession.value = owner.sessionId;
@@ -165,39 +175,37 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
   }
 
   void _authChanged() {
-    if (!mounted) return;
-    unawaited(_activate());
+    if (!mounted || _hasAuthority) return;
+    _binding++;
+    _allowExplicitPop = false;
+    _activation = null;
+    _ready = false;
+    _error = null;
+    _syncExitVisit();
+    setState(() {});
   }
 
   Future<void> _activate() async {
-    if (!mounted) return;
+    if (!mounted || !_hasAuthority) return;
     _allowExplicitPop = false;
     final owner = widget.viewModel;
     final auth = widget.auth;
-    final account = auth.isAdmin ? auth.currentUser?.id : null;
+    final authority = _authority!;
     final target = widget.submissionId;
     final session = widget.sessionId ?? _restoredSession.value;
     final binding = ++_binding;
     _ready = false;
     _error = null;
     _syncExitVisit();
-    if (account == null) {
-      setState(() {});
-      return;
-    }
     final result = await owner.activate(
-      accountId: account,
+      accountId: authority.accountId,
+      authority: authority,
       submissionId: target,
       sessionId: session,
       creatorName: auth.displayName ?? auth.email,
       creatorEmail: auth.email,
     );
-    if (!mounted) return;
-    if (binding != _binding ||
-        !auth.isAdmin ||
-        auth.currentUser?.id != account) {
-      return;
-    }
+    if (!mounted || !_hasAuthority || binding != _binding) return;
     setState(() {
       _ready = result is Success<void>;
       if (_ready) _activation = owner.activation;
@@ -269,7 +277,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
     AdminDraftActivation? activation,
     ModalRoute<dynamic>? route,
   ) {
-    if (!mounted) return;
+    if (!mounted || !_hasAuthority) return;
     if (!identical(widget.viewModel, owner) ||
         !identical(_editorRoute, route)) {
       return;
@@ -318,6 +326,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
 
   @override
   Widget build(BuildContext context) {
+    if (!_hasAuthority) return const SizedBox.expand();
     final owner = widget.viewModel;
     final auth = widget.auth;
     final active = owner.activation;
@@ -354,7 +363,7 @@ class _AdminSubmissionEditorRouteState extends State<AdminSubmissionEditorRoute>
                           TextButton(
                             key: const ValueKey('admin_return_active_editor'),
                             onPressed: () {
-                              if (!mounted) return;
+                              if (!mounted || !_hasAuthority) return;
                               if (!identical(widget.viewModel, owner) ||
                                   !identical(widget.auth, auth) ||
                                   !auth.isAdmin ||

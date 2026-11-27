@@ -1050,6 +1050,7 @@ void main() {
       harness = AdminSaveRouteHarness(persistedTargets: [1]);
       await harness.openEditor(tester, target: 1);
       final user = harness.auth.client.currentUser;
+      final original = harness.auth.viewModel.authority;
       final entered = Completer<void>();
       final released = Completer<Result<AdminSubmissionDraft?>>();
       harness.local.drafts.onLoadBySession = (_, _) {
@@ -1069,6 +1070,9 @@ void main() {
       expect(harness.owner.exitDecisionPending, isFalse);
       harness.auth.setUser(user);
       harness.auth.emit(AuthChangeEvent.signedIn);
+      await tester.idle();
+      expect(harness.auth.viewModel.authority, isNot(same(original)));
+      expect(harness.auth.viewModel.isAdmin, isTrue);
       harness.router.go('/admin/submissions/1');
       await tester.pumpAndSettle();
       harness.owner.setName(

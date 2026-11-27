@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
 import 'package:moliseis/domain/repositories/admin_submission_draft_repository.dart';
 import 'package:moliseis/domain/use-cases/geo_map_use_case.dart';
+import 'package:moliseis/routing/admin_route_history.dart';
 import 'package:moliseis/routing/admin_submission_exit_policy.dart';
 import 'package:moliseis/routing/core_routes.dart';
 import 'package:moliseis/routing/explicit_back.dart';
@@ -62,7 +63,9 @@ GoRouter buildAppRouter({
   required AdminAuthViewModel adminAuthViewModel,
 }) {
   final adminExit = AdminSubmissionExitPolicy(adminAuthViewModel);
+  late final AdminRouteHistoryRouter appRouter;
   Object? contentSubmissionTransitionOwner;
+  ValueKey<String>? pendingContentSubmissionExit;
 
   Object? acquireContentSubmissionTransition() {
     if (contentSubmissionTransitionOwner != null) return null;
@@ -83,16 +86,90 @@ GoRouter buildAppRouter({
     });
   }
 
-  return GoRouter(
-    navigatorKey: _rootNavigatorKey,
-    initialLocation: RoutePaths.home,
-    restorationScopeId: 'router',
-    refreshListenable: Listenable.merge([
-      syncViewModel.sync.results,
-      syncViewModel.sync.isRunning,
-      adminAuthViewModel,
-    ]),
+  Future<bool> exitContentSubmission(
+    BuildContext context,
+    GoRouterState state,
+  ) async {
+    final token = acquireContentSubmissionTransition();
+    if (token == null) return false;
+    pendingContentSubmissionExit = state.pageKey;
+    ContentSubmissionViewModel? owner;
+    String? identity;
+    var exiting = false;
+    bool current() {
+      if (!context.mounted) return false;
+      final captured = owner;
+      return captured != null &&
+          identical(context.read<ContentSubmissionViewModel?>(), captured) &&
+          captured.state.clientSubmissionId == identity;
+    }
+
+    try {
+      if (!context.mounted) return false;
+      final viewModel = context.read<ContentSubmissionViewModel>();
+      owner = viewModel;
+      identity = viewModel.state.clientSubmissionId;
+      if (viewModel.isSubmitting || viewModel.submissionFinalizationPending) {
+        return false;
+      }
+      if (!viewModel.hasUnsavedChanges) {
+        releaseAfterRouteRemoval(token);
+        exiting = true;
+        return true;
+      }
+      final choice = await showDialog<UnsavedChangesDecision>(
+        context: context,
+        builder: (_) => const UnsavedChangesDialog(),
+      );
+      if (!context.mounted) return false;
+      if (!current() ||
+          viewModel.isSubmitting ||
+          viewModel.submissionFinalizationPending) {
+        return false;
+      }
+      final result = switch (choice) {
+        UnsavedChangesDecision.saveAndExit => await viewModel.checkpointDraft(),
+        UnsavedChangesDecision.discardAndExit =>
+          await viewModel.restoreCheckpointDraft(),
+        UnsavedChangesDecision.cancel || null => null,
+      };
+      if (!context.mounted) return false;
+      if (!current() ||
+          viewModel.isSubmitting ||
+          viewModel.submissionFinalizationPending) {
+        return false;
+      }
+      if (result == null) return false;
+      if (result is Error<void>) {
+        showSnackBarGenericError(context: context);
+        return false;
+      }
+      releaseAfterRouteRemoval(token);
+      exiting = true;
+      return true;
+    } on Object catch (error, stack) {
+      if (error is AssertionError) rethrow;
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          context: ErrorDescription('leaving a content submission form'),
+        ),
+      );
+      if (current()) showSnackBarGenericError(context: context);
+      return false;
+    } finally {
+      pendingContentSubmissionExit = null;
+      if (!exiting) releaseContentSubmissionTransition(token);
+    }
+  }
+
+  final routing = RoutingConfig(
     onEnter: (context, current, next, router) {
+      if (router is AdminRouteHistoryRouter &&
+          (router.removingRetiredAdmin || router.validatingRestoredHistory)) {
+        return const Allow();
+      }
       final decision = adminExit.onEnter(context, current, next, router);
       if (next.matchedLocation != RoutePaths.gallery) return decision;
 
@@ -108,12 +185,6 @@ GoRouter buildAppRouter({
     redirect: (context, state) =>
         _redirectForSync(context, syncViewModel, state) ??
         _redirectForAdminAuth(adminAuthViewModel, state),
-    errorBuilder: (_, state) => RouteErrorScreen(
-      uri: state.uri,
-      error: state.error,
-      onBack: (context) =>
-          requestExplicitBack(context, unmatchedError: state.error),
-    ),
     routes: <RouteBase>[
       GoRoute(
         path: RoutePaths.sync,
@@ -127,83 +198,9 @@ GoRouter buildAppRouter({
       GoRoute(
         path: RoutePaths.contentSubmission,
         name: RouteNames.contentSubmission,
-        onExit: (context, _) async {
-          final token = acquireContentSubmissionTransition();
-          if (token == null) return false;
-          ContentSubmissionViewModel? owner;
-          String? identity;
-          var exiting = false;
-          bool current() {
-            if (!context.mounted) return false;
-            final captured = owner;
-            return captured != null &&
-                identical(
-                  context.read<ContentSubmissionViewModel?>(),
-                  captured,
-                ) &&
-                captured.state.clientSubmissionId == identity;
-          }
-
-          try {
-            if (!context.mounted) return false;
-            final viewModel = context.read<ContentSubmissionViewModel>();
-            owner = viewModel;
-            identity = viewModel.state.clientSubmissionId;
-            if (viewModel.isSubmitting ||
-                viewModel.submissionFinalizationPending) {
-              return false;
-            }
-            if (!viewModel.hasUnsavedChanges) {
-              releaseAfterRouteRemoval(token);
-              exiting = true;
-              return true;
-            }
-            final choice = await showDialog<UnsavedChangesDecision>(
-              context: context,
-              builder: (_) => const UnsavedChangesDialog(),
-            );
-            if (!context.mounted) return false;
-            if (!current() ||
-                viewModel.isSubmitting ||
-                viewModel.submissionFinalizationPending) {
-              return false;
-            }
-            final result = switch (choice) {
-              UnsavedChangesDecision.saveAndExit =>
-                await viewModel.checkpointDraft(),
-              UnsavedChangesDecision.discardAndExit =>
-                await viewModel.restoreCheckpointDraft(),
-              UnsavedChangesDecision.cancel || null => null,
-            };
-            if (!context.mounted) return false;
-            if (!current() ||
-                viewModel.isSubmitting ||
-                viewModel.submissionFinalizationPending) {
-              return false;
-            }
-            if (result == null) return false;
-            if (result is Error<void>) {
-              showSnackBarGenericError(context: context);
-              return false;
-            }
-            releaseAfterRouteRemoval(token);
-            exiting = true;
-            return true;
-          } on Object catch (error, stack) {
-            if (error is AssertionError) rethrow;
-            FlutterError.reportError(
-              FlutterErrorDetails(
-                exception: error,
-                stack: stack,
-                context: ErrorDescription('leaving a content submission form'),
-              ),
-            );
-            if (current()) showSnackBarGenericError(context: context);
-            return false;
-          } finally {
-            if (!exiting) releaseContentSubmissionTransition(token);
-          }
-        },
+        onExit: (context, state) => appRouter.retainsContentSubmission(state)
+            ? true
+            : exitContentSubmission(context, state),
         builder: (context, _) {
           final viewModel = context
               .select<ContentSubmissionViewModel, ContentSubmissionViewModel>(
@@ -245,19 +242,33 @@ GoRouter buildAppRouter({
       GoRoute(
         path: RoutePaths.admin,
         name: RouteNames.adminDashboard,
-        builder: (context, _) {
-          return ChangeNotifierProvider<AdminSubmissionsViewModel>(
-            create: (context) {
-              final viewModel = AdminSubmissionsViewModel(
-                repository: context.read(),
-              );
-              unawaited(viewModel.refreshSubmissions());
-              return viewModel;
-            },
-            builder: (context, _) => AdminDashboardScreen(
-              viewModel: context.read<AdminSubmissionsViewModel>(),
-              authViewModel: context.read<AdminAuthViewModel>(),
-              draftRepository: context.read<AdminSubmissionDraftRepository>(),
+        pageBuilder: (context, state) {
+          final authority = appRouter.admittedAuthority;
+          return MaterialPage<void>(
+            key: state.pageKey.value == RoutePaths.admin
+                ? ValueKey((state.pageKey, authority))
+                : state.pageKey,
+            name: state.name,
+            child: _adminBoundary(
+              adminAuthViewModel,
+              authority,
+              ChangeNotifierProvider<AdminSubmissionsViewModel>(
+                create: (context) {
+                  final viewModel = AdminSubmissionsViewModel(
+                    repository: context.read(),
+                    auth: adminAuthViewModel,
+                    authority: authority,
+                  );
+                  unawaited(viewModel.refreshSubmissions());
+                  return viewModel;
+                },
+                builder: (context, _) => AdminDashboardScreen(
+                  viewModel: context.read<AdminSubmissionsViewModel>(),
+                  authViewModel: adminAuthViewModel,
+                  draftRepository: context
+                      .read<AdminSubmissionDraftRepository>(),
+                ),
+              ),
             ),
           );
         },
@@ -265,12 +276,16 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminSubmissionsNew,
             name: RouteNames.adminSubmissionNew,
-            onExit: adminExit.exit,
+            onExit: (context, state) =>
+                appRouter.removingRetiredAdmin || !adminAuthViewModel.isAdmin
+                ? true
+                : adminExit.exit(context, state),
             builder: (context, state) {
-              final auth = context.read<AdminAuthViewModel>();
+              final authority = appRouter.admittedAuthority;
               return AdminSubmissionEditorRoute(
                 viewModel: context.read<AdminSubmissionEditorViewModel>(),
-                auth: auth,
+                auth: adminAuthViewModel,
+                authority: authority,
                 exitPolicy: adminExit,
                 exitLocation: state.matchedLocation,
                 sessionId: state.uri.queryParameters['session'],
@@ -286,12 +301,14 @@ GoRouter buildAppRouter({
               final attempt = int.tryParse(
                 state.uri.queryParameters['attempt'] ?? '',
               );
-              return !adminAuthViewModel.isAdmin ||
+              return appRouter.removingRetiredAdmin ||
+                  !adminAuthViewModel.isAdmin ||
                   owner.sessionId != session ||
                   owner.saveExecutionId != attempt ||
                   !owner.isSaveRunning;
             },
             builder: (context, state) {
+              final authority = appRouter.admittedAuthority;
               final owner = context.read<AdminSubmissionEditorViewModel>();
               final session = state.uri.queryParameters['session'];
               final progress = AdminSubmissionSaveProgressScreen(
@@ -303,10 +320,13 @@ GoRouter buildAppRouter({
                 editorTarget: state.uri.queryParameters['editor'],
               );
               // Missing or malformed presentation metadata cannot admit work.
-              if (session == null) return progress;
+              if (session == null) {
+                return _adminBoundary(adminAuthViewModel, authority, progress);
+              }
               return AdminSubmissionEditorRoute(
                 viewModel: owner,
-                auth: context.read<AdminAuthViewModel>(),
+                auth: adminAuthViewModel,
+                authority: authority,
                 sessionId: session,
                 exitPolicy: adminExit,
                 child: progress,
@@ -316,25 +336,34 @@ GoRouter buildAppRouter({
           GoRoute(
             path: RoutePaths.adminSubmission,
             name: RouteNames.adminSubmissionEditor,
-            onExit: adminExit.exit,
+            onExit: (context, state) =>
+                appRouter.removingRetiredAdmin || !adminAuthViewModel.isAdmin
+                ? true
+                : adminExit.exit(context, state),
             builder: (context, state) {
+              final authority = appRouter.admittedAuthority;
               final id = RouteParameters.submissionId(
                 state.pathParameters['id'],
               );
               if (id == null) {
-                return RouteErrorScreen(
-                  uri: state.uri,
-                  error: GoException(
-                    'Invalid submission id "${state.pathParameters['id']}"',
+                return _adminBoundary(
+                  adminAuthViewModel,
+                  authority,
+                  RouteErrorScreen(
+                    uri: state.uri,
+                    error: GoException(
+                      'Invalid submission id "${state.pathParameters['id']}"',
+                    ),
+                    onBack: (context) =>
+                        requestExplicitBack(context, predecessorOnly: true),
                   ),
-                  onBack: (context) =>
-                      requestExplicitBack(context, predecessorOnly: true),
                 );
               }
 
               return AdminSubmissionEditorRoute(
                 viewModel: context.read<AdminSubmissionEditorViewModel>(),
-                auth: context.read<AdminAuthViewModel>(),
+                auth: adminAuthViewModel,
+                authority: authority,
                 submissionId: id,
                 exitPolicy: adminExit,
                 exitLocation: state.matchedLocation,
@@ -577,7 +606,53 @@ GoRouter buildAppRouter({
         },
       ),
     ],
+  );
+  return appRouter = AdminRouteHistoryRouter(
+    routing: routing,
     observers: [if (kDebugMode) TalkerRouteObserver($talker!)],
+    auth: adminAuthViewModel,
+    onAuthorityRetired: adminExit.retireAuthority,
+    pendingContentSubmissionExit: () => pendingContentSubmissionExit,
+    navigatorKey: _rootNavigatorKey,
+    refreshListenable: Listenable.merge([
+      syncViewModel.sync.results,
+      syncViewModel.sync.isRunning,
+    ]),
+    errorPageBuilder: (_, state) {
+      final error = RouteErrorScreen(
+        uri: state.uri,
+        error: state.error,
+        onBack: (context) =>
+            requestExplicitBack(context, unmatchedError: state.error),
+      );
+      return MaterialPage<void>(
+        key: state.pageKey,
+        restorationId: state.pageKey.value,
+        child: isProtectedAdminLocation(state.uri.path)
+            ? _adminBoundary(
+                adminAuthViewModel,
+                appRouter.admittedAuthority,
+                error,
+              )
+            : error,
+      );
+    },
+  );
+}
+
+/// Retires protected pixels, input, focus and semantics before route disposal.
+Widget _adminBoundary(
+  AdminAuthViewModel auth,
+  AdminAuthority? authority,
+  Widget child,
+) {
+  return ListenableBuilder(
+    listenable: auth,
+    child: child,
+    builder: (context, child) =>
+        authority != null && identical(auth.authority, authority)
+        ? child!
+        : const SizedBox.expand(),
   );
 }
 
@@ -618,17 +693,14 @@ String? _redirectForAdminAuth(
   AdminAuthViewModel adminAuthViewModel,
   GoRouterState state,
 ) {
-  final location = state.matchedLocation;
-  final isAdminRoute =
-      location == RoutePaths.admin ||
-      location.startsWith('${RoutePaths.admin}/');
-  if (!isAdminRoute) return null;
-
+  final location = state.matchedLocation.toLowerCase();
   if (location == RoutePaths.adminLoginLocation) {
     return adminAuthViewModel.isAdmin ? RoutePaths.admin : null;
   }
 
-  return adminAuthViewModel.isAdmin ? null : RoutePaths.adminLoginLocation;
+  return !isProtectedAdminLocation(location) || adminAuthViewModel.isAdmin
+      ? null
+      : RoutePaths.adminLoginLocation;
 }
 
 /// Returns the [from] query value only when it is a safe internal URI.

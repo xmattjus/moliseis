@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_symbols_icons/symbols.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:moliseis/config/dependencies.dart';
@@ -30,8 +31,12 @@ enum SnackBarDuration { extrashort, short, medium, long }
 /// Convenience wrapper around [showSnackBar] for failures whose specific
 /// cause should not be shown to the user; the message is a fixed Italian
 /// string ("Si è verificato un errore, riprova più tardi").
-void showSnackBarGenericError({required BuildContext context}) => showSnackBar(
+void showSnackBarGenericError({
+  required BuildContext context,
+  ValueListenable<bool>? retired,
+}) => showSnackBar(
   context: context,
+  retired: retired,
   textContent: 'Si è verificato un errore, riprova più tardi',
   type: SnackBarType.error,
 );
@@ -46,8 +51,7 @@ void clearAppSnackBars() {
   _appSnackBarClearToken = Object();
   _persistentRequest?.cancel();
   _persistentRequest = null;
-  ++_ordinarySnackBarGeneration;
-  _ordinarySnackBarTail = null;
+  _resetOrdinarySnackBarTail();
 
   final globalMessenger = $scaffoldMessengerKey.currentState;
   _ordinarySnackBarMessenger = globalMessenger;
@@ -74,6 +78,7 @@ _PersistentSnackBarRequest? _persistentRequest;
 Future<void>? _ordinarySnackBarTail;
 ScaffoldMessengerState? _ordinarySnackBarMessenger;
 int _ordinarySnackBarGeneration = 0;
+int _ordinarySnackBarResetGeneration = 0;
 
 /// Shows an actionable recovery snack bar outside the native queue while
 /// ordinary feedback is active. The returned callback cancels this request;
@@ -126,6 +131,9 @@ VoidCallback showPersistentSnackBar({
 /// global messenger is unavailable, or an ordinary exception prevents
 /// display, the failure is logged through the injected [Logger]. Flutter
 /// contract errors and assertions remain visible.
+///
+/// A [retired] signal permanently withdraws this entry while preserving the
+/// native queue. The signal starts false and can only transition to true.
 void showSnackBar({
   required BuildContext context,
   required String textContent,
@@ -133,7 +141,9 @@ void showSnackBar({
   SnackBarAction? action,
   SnackBarDuration duration = SnackBarDuration.medium,
   bool replaceCurrent = false,
+  ValueListenable<bool>? retired,
 }) {
+  if (retired?.value == true) return;
   final globalMessenger = $scaffoldMessengerKey.currentState;
 
   if (globalMessenger == null) {
@@ -153,6 +163,7 @@ void showSnackBar({
       _clearOrdinarySnackBars(globalMessenger);
     }
 
+    final previous = _ordinarySnackBarTail ?? _persistentCloseTail?.future;
     final controller = globalMessenger.showSnackBar(
       _buildSnackBar(
         context,
@@ -160,10 +171,20 @@ void showSnackBar({
         type,
         action,
         _snackBarDurationEnumToDuration(duration),
+        retired: retired,
       ),
     );
     final generation = ++_ordinarySnackBarGeneration;
     _ordinarySnackBarTail = controller.closed;
+    if (retired != null) {
+      _withdrawRetiredSnackBar(
+        globalMessenger,
+        controller.closed,
+        previous,
+        generation,
+        retired,
+      );
+    }
     unawaited(
       controller.closed.then((_) {
         if (_ordinarySnackBarGeneration == generation) {
@@ -181,14 +202,71 @@ void showSnackBar({
   }
 }
 
+// A queued controller cannot close itself. Its predecessor's closure gives
+// this entry the native queue head until its own closure or a queue reset.
+void _withdrawRetiredSnackBar(
+  ScaffoldMessengerState messenger,
+  Future<void> closed,
+  Future<void>? previous,
+  int generation,
+  ValueListenable<bool> retired,
+) {
+  var isClosed = false;
+  bool ownsHead() =>
+      !isClosed &&
+      generation > _ordinarySnackBarResetGeneration &&
+      identical(messenger, $scaffoldMessengerKey.currentState);
+  void withdraw() {
+    if (!retired.value) return;
+    // The first hop leaves the current build and lets a same-turn native
+    // dismissal finish. The second lets its closed Future invalidate ownership
+    // before removal, while still withdrawing before the next frame.
+    // This helper owns app-driven queue mutations. A direct hide, remove,
+    // controller close or clear can change the head without updating our
+    // ownership records. In particular, a native removal queued between these
+    // hops can move the head ahead of its closed callback. Implement future
+    // removal and clearing here, coordinating the tail and reset generation.
+    scheduleMicrotask(() {
+      scheduleMicrotask(() {
+        if (ownsHead()) messenger.removeCurrentSnackBar();
+      });
+    });
+  }
+
+  unawaited(
+    closed.then((_) {
+      isClosed = true;
+      retired.removeListener(withdraw);
+    }),
+  );
+  void reachedHead() {
+    if (!ownsHead()) return;
+    if (retired.value) {
+      withdraw();
+    } else {
+      retired.addListener(withdraw);
+    }
+  }
+
+  if (previous == null) {
+    reachedHead();
+  } else {
+    unawaited(previous.then((_) => reachedHead()));
+  }
+}
+
+void _resetOrdinarySnackBarTail() {
+  _ordinarySnackBarResetGeneration = ++_ordinarySnackBarGeneration;
+  _ordinarySnackBarTail = null;
+}
+
 void _bindMessenger(ScaffoldMessengerState messenger) {
   final request = _persistentRequest;
   if (request != null && !identical(request.messenger, messenger)) {
     request.cancel();
   }
   if (!identical(_ordinarySnackBarMessenger, messenger)) {
-    ++_ordinarySnackBarGeneration;
-    _ordinarySnackBarTail = null;
+    _resetOrdinarySnackBarTail();
     _ordinarySnackBarMessenger = messenger;
   }
   final closing = _persistentCloseTail;
@@ -198,8 +276,7 @@ void _bindMessenger(ScaffoldMessengerState messenger) {
 }
 
 void _clearOrdinarySnackBars(ScaffoldMessengerState messenger) {
-  ++_ordinarySnackBarGeneration;
-  _ordinarySnackBarTail = null;
+  _resetOrdinarySnackBarTail();
   messenger
     ..clearSnackBars()
     ..removeCurrentSnackBar();
@@ -425,6 +502,7 @@ SnackBar _buildSnackBar(
   Duration duration, {
   bool persist = false,
   bool showCloseIcon = false,
+  ValueListenable<bool>? retired,
 }) {
   const contentMaxLines = 2;
   const horizontalMargin = 24.0;
@@ -493,6 +571,7 @@ SnackBar _buildSnackBar(
   return SnackBar(
     content: Builder(
       builder: (context) {
+        if (retired?.value == true) return const SizedBox.shrink();
         final contentStyle = context.textTheme.bodyMedium!.copyWith(
           color: foreground,
         );

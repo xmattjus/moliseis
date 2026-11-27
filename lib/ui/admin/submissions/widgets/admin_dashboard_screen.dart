@@ -62,6 +62,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Object? _providedEditor;
   String? _account;
   bool _admin = false;
+  AdminAuthority? _admittedAuthority;
   bool _current = false;
   Uri? _location;
   bool _backRequested = false;
@@ -72,6 +73,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   bool _lookupScheduled = false;
   (bool, AdminSubmissionStatus?)? _selection;
   Object? _manualRefresh;
+  ValueNotifier<bool> _feedbackRetired = ValueNotifier(false);
   // Dismissed reads retain their prior placeholders until safe settlement.
   final _manualReads =
       <(AdminSubmissionsViewModel, bool), ({Object token, bool hadError})>{};
@@ -83,6 +85,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   VoidCallback? _cancelRecovery;
   _RecoveryIdentity? _candidate;
   final _suppressed = <_RecoveryIdentity>{};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.viewModel.bindAuth(widget.authViewModel);
+  }
 
   @override
   void didChangeDependencies() {
@@ -122,6 +130,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void didUpdateWidget(AdminDashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    widget.viewModel.bindAuth(widget.authViewModel);
     if (!identical(oldWidget.draftRepository, widget.draftRepository) ||
         !identical(oldWidget.viewModel, widget.viewModel) ||
         !identical(oldWidget.authViewModel, widget.authViewModel)) {
@@ -155,14 +164,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     _retireRecovery();
   }
 
+  void _retireFeedback() {
+    _feedbackRetired.value = true;
+    _feedbackRetired.dispose();
+  }
+
   void _resetVisit() {
+    _retireFeedback();
+    _feedbackRetired = ValueNotifier(false);
     _visit++;
     _revokePresentation();
     _recoveryAttempt = null;
     _editorVisit = null;
     _editorCovered = false;
+    _manualReads.clear();
     _suppressed.clear();
     _backRequested = false;
+    _admittedAuthority = _auth?.authority;
     _account = _auth?.currentUser?.id;
     _admin = _auth?.isAdmin ?? false;
     _selection = (_owner!.showIgnored, _owner!.filter);
@@ -171,7 +189,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void _onAuth() {
     if (!mounted) return;
     final auth = _auth!;
-    if (_account == auth.currentUser?.id &&
+    if (identical(_admittedAuthority, auth.authority) &&
+        _account == auth.currentUser?.id &&
         _admin == auth.isAdmin &&
         !auth.isDisposed) {
       return;
@@ -272,6 +291,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       route: _route,
       location: _router!.routerDelegate.currentConfiguration.uri,
       account: auth.currentUser!.id,
+      authority: auth.authority!,
       visit: _visit,
       routeGeneration: _routeGeneration,
       snackBarClearToken: appSnackBarClearToken,
@@ -292,6 +312,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             authority.location &&
         identical(_route, authority.route) &&
         authority.route?.isCurrent != false &&
+        identical(authority.auth.authority, authority.authority) &&
         !authority.auth.isDisposed &&
         authority.auth.isAdmin &&
         authority.auth.currentUser?.id == authority.account &&
@@ -442,7 +463,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (fresh != identity) {
       _recoveryAttempt = null;
       if (result is Error<AdminSubmissionDraft?>) {
-        showSnackBarGenericError(context: context);
+        showSnackBarGenericError(context: context, retired: _feedbackRetired);
       }
       if (fresh != null) _presentRecovery(authority, fresh);
       return;
@@ -531,6 +552,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   void dispose() {
     _unbind();
+    _retireFeedback();
     _visit++;
     _revokePresentation();
     _editorVisit = null;
@@ -628,6 +650,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         outcome.outcome == AdminDashboardRefreshOutcome.unexpectedFailure) {
       showSnackBar(
         context: context,
+        retired: _feedbackRetired,
         textContent:
             "Si è verificato un errore durante l'aggiornamento dei contenuti",
         type: SnackBarType.error,
@@ -725,6 +748,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
+    if (viewModel.isDisposed) return const SizedBox.shrink();
 
     return Scaffold(
       body: RefreshIndicator.noSpinner(
@@ -1101,6 +1125,7 @@ final class _DashboardAuthority {
     required this.route,
     required this.location,
     required this.account,
+    required this.authority,
     required this.visit,
     required this.routeGeneration,
     required this.snackBarClearToken,
@@ -1113,6 +1138,7 @@ final class _DashboardAuthority {
   final ModalRoute<dynamic>? route;
   final Uri location;
   final String account;
+  final AdminAuthority authority;
   final int visit;
   final int routeGeneration;
   final Object snackBarClearToken;

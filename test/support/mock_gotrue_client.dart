@@ -153,7 +153,7 @@ final class ControllableAdminAuth {
 
   /// Emits an authentication event for the current backing user.
   void emit(AuthChangeEvent change) {
-    events.add(AuthState(change, null));
+    events.add(AuthState(change, _currentSession));
   }
 
   /// Closes the event stream and disposes the real view model.

@@ -168,6 +168,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   int _generation = 0;
   bool _revoked = false;
   AdminAuthViewModel? _auth;
+  AdminAuthority? _activationAuthority;
   String? _activeAccountId;
   final _commandGenerations = <commands.Command<dynamic, dynamic>, int>{};
   AdminDraftExitReview? _exitReview;
@@ -192,14 +193,22 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
 
   /// Whether the supplied rendered callback still owns this exact activation.
   bool isActivationCurrent(AdminDraftActivation? token) {
-    if (_disposed || _revoked) return false;
+    if (_disposed || _revoked || !_hasActivationAuthority) return false;
     if (_draftSession == null) return token == null;
     return _draftSession.isActivationCurrent(token);
   }
 
   bool _authority(AdminDraftActivation? token) => isActivationCurrent(token);
   bool _obsolete(int generation) =>
-      _disposed || _revoked || generation != _generation;
+      _disposed ||
+      _revoked ||
+      !_hasActivationAuthority ||
+      generation != _generation;
+
+  bool get _hasActivationAuthority =>
+      _auth == null ||
+      (_activationAuthority != null &&
+          identical(_activationAuthority, _auth!.authority));
 
   /// Attaches directly so auth revocation precedes deferred Provider rebuilds.
   void bindAuth(AdminAuthViewModel auth) {
@@ -214,8 +223,8 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     final auth = _auth;
     if (auth == null) return;
     if (!auth.isAdmin ||
-        (_activeAccountId != null &&
-            auth.currentUser?.id != _activeAccountId)) {
+        (_activationAuthority != null || _activeAccountId != null) &&
+            !_hasActivationAuthority) {
       revoke();
     }
   }
@@ -229,6 +238,7 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
     _activeImageUploadTask?.cancel();
     _draftSession?.revoke();
     _activeAccountId = null;
+    _activationAuthority = null;
     _clearContext();
     _notifyListeners();
   }
@@ -236,19 +246,28 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
   /// Activates a durable target without replacing dirty or admitted work.
   Future<Result<void>> activate({
     required String accountId,
+    AdminAuthority? authority,
     int? submissionId,
     String? sessionId,
     String? creatorName,
     String? creatorEmail,
   }) async {
     final session = _draftSession;
-    if (_disposed ||
-        session == null ||
-        (_auth != null &&
-            (!_auth!.isAdmin || _auth!.currentUser?.id != accountId))) {
-      return _unavailable();
+    final auth = _auth;
+    final admitted = authority ?? auth?.authority;
+    bool isAuthorized() =>
+        auth == null ||
+        identical(_auth, auth) &&
+            identical(admitted, auth.authority) &&
+            admitted?.accountId == accountId;
+    if (_disposed || session == null || !isAuthorized()) return _unavailable();
+    if (_activationAuthority != null && !_hasActivationAuthority) {
+      revoke();
+      if (_disposed || !isAuthorized()) return _unavailable();
     }
     final activationGeneration = _generation;
+    bool canInstall() =>
+        !_disposed && activationGeneration == _generation && isAuthorized();
     final previous = session.state?.owner;
     if (sessionId != null &&
         previous?.accountId == accountId &&
@@ -263,27 +282,25 @@ class AdminSubmissionEditorViewModel extends ChangeNotifier {
         (sessionId != null
             ? previous?.sessionId == sessionId
             : previous?.submissionId == submissionId);
-    if (same) return await session.initialize();
+    if (same) return await session.initialize(isCurrent: canInstall);
     if (!_revoked && (operationRunning || _exitReview != null)) {
       return Result.error(
         Exception('Attendi il completamento dell’operazione corrente.'),
       );
     }
+    _activationAuthority = admitted;
     final result = sessionId == null
         ? await session.activate(
             AdminDraftOwner(accountId: accountId, submissionId: submissionId),
+            isCurrent: canInstall,
           )
         : await session.activateBySession(
             accountId: accountId,
             sessionId: sessionId,
             expectedSubmissionId: submissionId,
+            isCurrent: canInstall,
           );
-    if (_disposed ||
-        activationGeneration != _generation ||
-        (_auth != null &&
-            (!_auth!.isAdmin || _auth!.currentUser?.id != accountId))) {
-      return _unavailable();
-    }
+    if (!canInstall()) return _unavailable();
     if (result is Error<void>) return result;
     _generation++;
     _revoked = false;

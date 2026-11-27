@@ -251,14 +251,17 @@ final class AdminDraftSession {
       _state?.ready != true || _pending != 0 || _state!.hydrationPending;
 
   /// Captures a new activation after refusing abandonment of unsaved work.
+  /// [isCurrent] fences pending activation at asynchronous boundaries.
   Future<Result<void>> activate(
     AdminDraftOwner provisionalOwner, {
     AdminDraftSnapshot? freshSnapshot,
+    bool Function()? isCurrent,
   }) {
+    if (isCurrent?.call() == false) return Future.value(_unavailable());
     final previous = _state;
     if (previous != null &&
         previous.owner.lookupKey == provisionalOwner.lookupKey) {
-      return initialize();
+      return initialize(isCurrent: isCurrent);
     }
     if (previous != null &&
         (previous.hasUncheckpointedChanges ||
@@ -284,21 +287,25 @@ final class AdminDraftSession {
       effective: fresh,
       durability: AdminDraftDurability.unknown,
     );
-    return initialize();
+    return initialize(isCurrent: isCurrent);
   }
 
   /// Shares one complete loading/reconciliation attempt; failure permits retry.
-  Future<Result<void>> initialize() {
-    if (_state == null) return Future.value(_unavailable());
+  Future<Result<void>> initialize({bool Function()? isCurrent}) {
+    if (_state == null || isCurrent?.call() == false) {
+      return Future.value(_unavailable());
+    }
     if (_state!.ready) return Future.value(const Result.success(null));
     if (_initializing != null) return _initializing!;
     final generation = _generation;
     final owner = _state!.owner;
+    bool canInstall() =>
+        _matches(owner, generation) && isCurrent?.call() != false;
     final attempt = _serialize<void>(() async {
-      if (!_matches(owner, generation)) return _unavailable();
+      if (!canInstall()) return _unavailable();
       if (_state!.durability == AdminDraftDurability.durable) {
         final reconciled = await _staged.reconcileAndLoad(owner);
-        if (!_matches(owner, generation)) return _unavailable();
+        if (!canInstall()) return _unavailable();
         if (reconciled case Error<List<AdminSubmissionStagedAsset>>(
           :final error,
         )) {
@@ -315,7 +322,7 @@ final class AdminDraftSession {
         accountId: owner.accountId,
         submissionId: owner.submissionId,
       );
-      if (!_matches(owner, generation)) return _unavailable();
+      if (!canInstall()) return _unavailable();
       if (loaded case Error<AdminSubmissionDraft?>(:final error)) {
         return Result.error(error);
       }
@@ -328,7 +335,7 @@ final class AdminDraftSession {
         return const Result.success(null);
       }
       final restored = await _staged.reconcileAndLoad(draft.owner);
-      if (!_matches(owner, generation)) return _unavailable();
+      if (!canInstall()) return _unavailable();
       if (restored case Error<List<AdminSubmissionStagedAsset>>(:final error)) {
         return Result.error(error);
       }
@@ -601,17 +608,22 @@ final class AdminDraftSession {
   ///
   /// An explicit remote route must match [expectedSubmissionId]. A targetless
   /// resume hint, such as `/new` after adoption, does not impose this constraint.
+  /// [isCurrent] also fences the lookup before it can install a draft owner.
   Future<Result<void>> activateBySession({
     required String accountId,
     required String sessionId,
     int? expectedSubmissionId,
+    bool Function()? isCurrent,
   }) async {
+    if (isCurrent?.call() == false) return _unavailable();
     final generation = _generation;
     final result = await _drafts.loadDraftBySession(
       accountId: accountId,
       sessionId: sessionId,
     );
-    if (generation != _generation) return _unavailable();
+    if (generation != _generation || isCurrent?.call() == false) {
+      return _unavailable();
+    }
     if (result case Error<AdminSubmissionDraft?>(:final error)) {
       return Result.error(error);
     }
@@ -621,7 +633,7 @@ final class AdminDraftSession {
         draft.owner.submissionId != expectedSubmissionId) {
       return _unavailable('Resume session target mismatch.');
     }
-    return await activate(draft.owner);
+    return await activate(draft.owner, isCurrent: isCurrent);
   }
 
   /// Checkpoints captured A while preserving a newer explicit checkpoint B.

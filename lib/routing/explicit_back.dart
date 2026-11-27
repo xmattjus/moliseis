@@ -91,7 +91,11 @@ bool _matchesPage(
   RouteMatch match,
   Uri uri,
 ) {
-  if (page.key != match.pageKey) return false;
+  // The declarative Dashboard rotates its physical key across authorities.
+  if (page.key != match.pageKey &&
+      match.route.name != RouteNames.adminDashboard) {
+    return false;
+  }
   final GoRouterState installed;
   try {
     installed = GoRouterState.of(context);
@@ -102,7 +106,7 @@ bool _matchesPage(
     return false;
   }
   // An unassociated Page can also resolve to an ancestor's state.
-  if (installed.pageKey != page.key ||
+  if (installed.pageKey != match.pageKey ||
       installed.name != match.route.name ||
       installed.path != match.route.path ||
       installed.matchedLocation != match.matchedLocation ||

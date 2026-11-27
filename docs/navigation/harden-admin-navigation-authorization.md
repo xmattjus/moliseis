@@ -1,36 +1,44 @@
-# Investigate and harden Admin navigation authorization
+# Harden Admin navigation authorization
 
-**Status — investigation required before the next public release.** The
-project owner retains the release decision after investigation and severity
-assessment. This work can proceed independently of
-[deferred route exits](harden-deferred-route-exits.md).
+**Status — implementation prepared for independent review. Public release blocked.** The project
+owner retains the release decision. Follow the
+[OpenSpec change](../../openspec/changes/harden-admin-navigation-authorization/proposal.md).
+This work is independent of [deferred route exits](harden-deferred-route-exits.md).
 
-## Demonstrated behavior
+The investigation at `8c0e61ea42d98641bbb57d829627171bd1a3d279` reproduced
+a pending imperative cover that installed Login above revoked Admin
+history. Back restored a populated Dashboard with submission and
+ignored-source data and could also restore malformed, Editor and Save
+Progress routes. Stale Dashboard controls reached a synthetic repository
+after revocation. A direct switch to another administrator retained the
+old Dashboard and allowed prior intent and results to cross accounts.
+The tested Editor paths rejected stale privileged operations and did
+not disclose private drafts. The probes established client defects and
+produced no unauthorized remote mutation.
 
-1. With Admin authority, push the malformed submission diagnostic and let it
-   settle. Push an Admin Dashboard cover and drain microtasks without a
-   frame. The cover has committed while the diagnostic is still the
-   Navigator's installed top Route.
-2. Revoke Admin authority. The auth refresh can reinterpret the outstanding
-   push, redirect its destination to Login and retain the existing Admin
-   entries beneath Login.
-3. Reconcile the screen and send system Back. The diagnostic can become
-   visible again while `isAdmin` is false.
+The dependency checkpoint reproduced all four Admin findings on GoRouter
+18.1.4. The implementation binds protected routes, presentation and work to
+continuous observed authority and removes obsolete Admin history. NAV-01 is
+enabled with its original Map-root Back and inactive Post retention assertions.
+The upstream branch-activity correction passed the widget test. Physical
+system and predictive Back remain part of device verification.
 
-The investigation reproduced this sequence both at the pre-remediation
-baseline (`e15233f`) and with the deferred-exit workaround (`38ddca5`). The
-ordering matters. After the cover is installed, the auth refresh can replace
-the stack with Login.
+Reconciliation keeps committed public history above the clean prefix in
+its original order, including a public form beneath a protected cover.
+A Progress push requested but not yet committed is kept as well. A
+signed-out restoration of a saved Admin base with a public cover may
+safely restore Login alone; this is an accepted limitation.
 
-Private-data exposure and backend authorization bypass were not demonstrated.
-The diagnostic's visibility establishes a presentation and history issue.
-Evaluate client-side presentation and action admission independently of
-server-side data and action authorization.
+The disposable Supabase run confirmed current server-role enforcement and
+observed zero additional endpoint requests from a retired Dashboard
+callback. A request that had already passed server authorization could
+still complete after demotion. The local results do not establish
+production deployment behavior.
+[Verification record](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md).
 
-## Investigation scope
+## Open release gates
 
-Determine whether retained history can expose Admin Dashboard data, editor
-state or private drafts, previous-account data, or protected feature actions.
-Cover sign-out, role revocation and account replacement. Verify both the
-visible history and applicable server enforcement before assigning severity
-or proposing a correction.
+- Record owner-observed
+  [physical Android and iOS results](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md#owner-executed-physical-device-release-gates).
+- Resolve or explicitly record remaining runtime limits and obtain the
+  project owner's release decision.
