@@ -14,9 +14,10 @@ bool isProtectedAdminLocation(String path) {
           location.startsWith('${RoutePaths.admin}/'));
 }
 
-typedef _PublicCoverRestore = ({
+/// One authority-driven reconciliation request issued from its source list.
+typedef _Reconciliation = ({
   RouteMatchList source,
-  RouteMatchList replacement,
+  RouteMatchList base,
   ({Uri uri, Object? extra})? pendingGo,
 });
 
@@ -52,8 +53,10 @@ final class AdminRouteHistoryRouter extends GoRouter {
   final AdminAuthViewModel _auth;
   final VoidCallback _onAuthorityRetired;
   final ValueGetter<ValueKey<String>?> _pendingContentSubmissionExit;
-  _PublicCoverRestore? _pendingPublicRestore;
-  _PublicCoverRestore? _applyingPublicRestore;
+  _Reconciliation? _pendingReconciliation;
+  // Set only while the delegate synchronously applies a reconciled list.
+  ({_Reconciliation? request, RouteMatchList source, RouteMatchList delivered})?
+  _applying;
   AdminAuthority? _authority;
   RouteMatchList? _retiring;
   bool _interrupted = false;
@@ -78,23 +81,23 @@ final class AdminRouteHistoryRouter extends GoRouter {
   /// Whether this exit callback refers to the original retained form Page.
   ///
   /// GoRouter rechecks the old suffix even when a Page remains in that suffix.
+  /// Only the reconciled list being delivered can retain that exact match.
   bool retainsContentSubmission(GoRouterState state) {
-    final restore = _applyingPublicRestore;
+    final applying = _applying;
     final current = routerDelegate.currentConfiguration;
-    if (restore == null ||
+    if (applying == null ||
         !removingRetiredAdmin ||
-        !identical(restore.source, current)) {
+        !identical(applying.source, current)) {
       return false;
     }
-    return current.matches.any(
+    final form = _walk(current.matches).where(
       (match) =>
           match is ImperativeRouteMatch &&
           match.route.name == RouteNames.contentSubmission &&
-          match.pageKey == state.pageKey &&
-          restore.replacement.matches.any(
-            (retained) => identical(retained, match),
-          ),
+          match.pageKey == state.pageKey,
     );
+    return form.isNotEmpty &&
+        _walk(applying.delivered.matches).contains(form.first);
   }
 
   /// An untrusted saved request cannot begin an editor exit lookup.
@@ -113,10 +116,10 @@ final class AdminRouteHistoryRouter extends GoRouter {
     // Physical Back can remove matches without parsing another request.
     if (parsed != null) _configurationAuthority = parsed.authority;
     if (!removingRetiredAdmin) _retiring = null;
-    final restore = _applyingPublicRestore;
-    final pendingGo = restore?.pendingGo;
-    _pendingPublicRestore = null;
-    if (pendingGo != null && identical(restore?.replacement, current)) {
+    final applying = _applying;
+    final pendingGo = applying?.request?.pendingGo;
+    _pendingReconciliation = null;
+    if (pendingGo != null && identical(applying?.delivered, current)) {
       final request = routeInformationProvider.value;
       scheduleMicrotask(() {
         if (identical(current, routerDelegate.currentConfiguration) &&
@@ -187,86 +190,105 @@ final class AdminRouteHistoryRouter extends GoRouter {
     }
   }
 
-  _PublicCoverRestore? _requestedPublicRestore(
+  _Reconciliation? _requestedReconciliation(
     RouteMatchList current,
     Object? request,
   ) {
-    final restore = _pendingPublicRestore;
-    return restore != null &&
-            identical(restore.source, current) &&
+    final pending = _pendingReconciliation;
+    return pending != null &&
+            identical(pending.source, current) &&
             request is RouteInformationState &&
-            request.type == NavigatingType.restore &&
-            identical(request.baseRouteMatchList, restore.replacement)
-        ? restore
+            (request.type == NavigatingType.restore ||
+                request.type == NavigatingType.push) &&
+            identical(request.baseRouteMatchList, pending.base)
+        ? pending
         : null;
   }
 
   void _removeRetiredHistory(RouteMatchList current) {
-    if (_requestedPublicRestore(
-          current,
-          routeInformationProvider.value.state,
-        ) !=
-        null) {
+    final request = routeInformationProvider.value;
+    if (_requestedReconciliation(current, request.state) != null) return;
+    _pendingReconciliation = null;
+    _retiring = current;
+    final top = _topUri(current);
+    final (:base, :retained) = _publicHistory(current);
+    final coverRetained = identical(retained.lastOrNull, _leaf(current));
+    final pendingPush = coverRetained ? _pendingPublicPush(current) : null;
+    if (pendingPush != null) {
+      // The retained public surface already admitted this push, for example
+      // Progress after submission. Reissue it on the safe base and complete
+      // the caller's original Future when the new match pops.
+      _pendingReconciliation = (source: current, base: base, pendingGo: null);
+      unawaited(
+        routeInformationProvider
+            .push<Object?>(
+              request.uri.toString(),
+              base: base,
+              extra: pendingPush.extra,
+            )
+            .then((result) {
+              if (!pendingPush.completer.isCompleted) {
+                pendingPush.completer.complete(result);
+              }
+            }),
+      );
       return;
     }
-    _pendingPublicRestore = null;
-    final top = _topUri(current);
-    final obsolete = _protectedMatch(current.matches);
-    _retiring = current;
-    final prefix = obsolete == null
-        ? RouteMatchList.empty
-        : current.remove(obsolete);
-    final cover = current.lastOrNull;
-    final publicForms = current.matches
-        .skip(prefix.matches.length)
-        .whereType<ImperativeRouteMatch>()
-        .where((match) => match.route.name == RouteNames.contentSubmission);
-    final pendingPublic = _pendingPublicGo(current);
+    final pendingGo = _pendingPublicGo(current);
+    if (pendingGo != null && retained.isNotEmpty) {
+      final pendingExit = _pendingContentSubmissionExit();
+      // A go removes retained public routes under their own exit guards.
+      // Reissue it from the safe history unless that exit already started.
+      _pendingReconciliation = (
+        source: current,
+        base: base,
+        pendingGo:
+            pendingGo.uri == top ||
+                retained.any((match) => match.pageKey == pendingExit)
+            ? null
+            : pendingGo,
+      );
+      if (coverRetained || pendingGo.uri != top) {
+        restore(base);
+        return;
+      }
+    }
     final target = _withoutAdminSyncReturn(
-      pendingPublic?.uri ??
+      pendingGo?.uri ??
           (isProtectedAdminLocation(top.path) ? Uri.parse(_adminLanding) : top),
     );
-    if ((target == top || publicForms.isNotEmpty) &&
-        cover is ImperativeRouteMatch &&
-        !isProtectedAdminLocation(top.path) &&
-        top.path != RoutePaths.sync &&
-        (prefix.isNotEmpty || publicForms.isNotEmpty)) {
-      var replacement = prefix.isEmpty
-          ? configuration.findMatch(Uri.parse(RoutePaths.home))
-          : prefix;
-      for (final form in publicForms) {
-        if (!identical(form, cover)) replacement = replacement.push(form);
-      }
-      replacement = replacement.push(cover);
-      if (publicForms.isNotEmpty) {
-        final pendingExit = _pendingContentSubmissionExit();
-        // An already-delegated public exit can finish on its existing decision.
-        // Replay a pending request only if its own exit has not started yet.
-        final pendingGo =
-            pendingPublic?.uri == top ||
-                publicForms.any((match) => match.pageKey == pendingExit)
-            ? null
-            : pendingPublic;
-        _pendingPublicRestore = (
-          source: current,
-          replacement: replacement,
-          pendingGo: pendingGo,
-        );
-      }
-      restore(replacement);
-      return;
+    if (base.isNotEmpty) {
+      _pendingReconciliation ??= (source: current, base: base, pendingGo: null);
     }
     _navigateFrom(
-      prefix,
-      target,
+      base,
+      coverRetained ? _topUri(base) : target,
       extra: target.path == RoutePaths.admin
           ? ++_dashboardReplacement
-          : pendingPublic != null
-          ? pendingPublic.extra
+          : pendingGo != null
+          ? pendingGo.extra
           : target == top
           ? _topExtra(current)
           : null,
     );
+  }
+
+  /// A public push issued from the committed configuration, before its parse.
+  ({Object? extra, Completer<dynamic> completer})? _pendingPublicPush(
+    RouteMatchList current,
+  ) {
+    final request = routeInformationProvider.value;
+    final state = request.state;
+    final completer = state is RouteInformationState ? state.completer : null;
+    if (state is! RouteInformationState ||
+        state.type != NavigatingType.push ||
+        completer == null ||
+        !identical(state.baseRouteMatchList, current) ||
+        isProtectedAdminLocation(request.uri.path) ||
+        configuration.findMatch(request.uri).isError) {
+      return null;
+    }
+    return (extra: state.extra, completer: completer);
   }
 
   ({Uri uri, Object? extra})? _pendingPublicGo(RouteMatchList current) {
@@ -344,6 +366,56 @@ final class AdminRouteHistoryRouter extends GoRouter {
       isProtectedAdminLocation(matches.uri.path) ||
       _protectedMatch(matches.matches) != null;
 
+  /// The clean prefix with every later public imperative match reattached.
+  ///
+  /// `remove` truncates everything after the first protected match. Pushing
+  /// the original matches back keeps their order, Page keys and completers
+  /// and lets GoRouter rebuild any shell ancestry. Sync is never retained:
+  /// its return target can be private, and its owner reissues it as needed.
+  ({RouteMatchList base, List<ImperativeRouteMatch> retained}) _publicHistory(
+    RouteMatchList matches,
+  ) {
+    final obsolete = _protectedMatch(matches.matches);
+    final retained = <ImperativeRouteMatch>[];
+    var discarded = obsolete == null;
+    for (final match in _walk(matches.matches)) {
+      if (identical(match, obsolete)) {
+        discarded = true;
+      } else if (discarded &&
+          match is ImperativeRouteMatch &&
+          !isProtectedAdminLocation(match.matches.uri.path) &&
+          match.matches.uri.path != RoutePaths.sync) {
+        retained.add(match);
+      }
+    }
+    var base = obsolete == null
+        ? RouteMatchList.empty
+        : matches.remove(obsolete);
+    if (base.isEmpty && retained.isNotEmpty) {
+      base = configuration.findMatch(Uri.parse(RoutePaths.home));
+    }
+    for (final match in retained) {
+      base = base.push(match);
+    }
+    return (base: base, retained: retained);
+  }
+
+  static RouteMatchBase? _leaf(RouteMatchList matches) {
+    RouteMatchBase? match = matches.lastOrNull;
+    while (match is ShellRouteMatch) {
+      match = match.matches.lastOrNull;
+    }
+    return match;
+  }
+
+  /// Tree order, as used by `RouteMatchList.remove`.
+  static Iterable<RouteMatchBase> _walk(List<RouteMatchBase> matches) sync* {
+    for (final match in matches) {
+      yield match;
+      if (match is ShellRouteMatch) yield* _walk(match.matches);
+    }
+  }
+
   RouteMatchList _freshRestoration(
     RouteMatchList matches, {
     required bool canResume,
@@ -353,10 +425,7 @@ final class AdminRouteHistoryRouter extends GoRouter {
     if (!_containsAdmin(matches)) {
       return safeSync == top ? matches : configuration.findMatch(safeSync);
     }
-    final obsolete = _protectedMatch(matches.matches);
-    final prefix = obsolete == null
-        ? RouteMatchList.empty
-        : matches.remove(obsolete);
+    final (:base, :retained) = _publicHistory(matches);
     if (isProtectedAdminLocation(top.path)) {
       // A cold, declarative editor can validate its own account-qualified hint.
       // Never restore an old imperative editor stack or outstanding Progress.
@@ -370,18 +439,16 @@ final class AdminRouteHistoryRouter extends GoRouter {
       if (_topUri(current).path == _adminLanding && !removingRetiredAdmin) {
         return current;
       }
-      return prefix.isNotEmpty
-          ? prefix
+      return base.isNotEmpty
+          ? base
           : configuration.findMatch(
               Uri.parse(_adminLanding),
               extra: _auth.isAdmin ? ++_dashboardReplacement : null,
             );
     }
-    if (prefix.isEmpty) return configuration.findMatch(safeSync);
-    if (_topUri(prefix) == safeSync) return prefix;
-    final cover = matches.lastOrNull;
-    return cover is ImperativeRouteMatch && safeSync == top
-        ? prefix.push(cover)
+    return identical(retained.lastOrNull, _leaf(matches)) ||
+            base.isNotEmpty && _topUri(base) == safeSync
+        ? base
         : configuration.findMatch(safeSync);
   }
 
@@ -390,7 +457,7 @@ final class AdminRouteHistoryRouter extends GoRouter {
     _auth.removeListener(_authChanged);
     routerDelegate.removeListener(_configurationCommitted);
     _retiring = null;
-    _pendingPublicRestore = null;
+    _pendingReconciliation = null;
     super.dispose();
   }
 }
@@ -459,31 +526,41 @@ final class _AdminHistoryParser extends GoRouteInformationParser {
         ),
       );
     });
-    final restore = _router._requestedPublicRestore(current, request);
-    if (restore == null) return admitted;
+    final requested = _router._requestedReconciliation(current, request);
+    if (requested == null &&
+        !(needsValidation && _router.removingRetiredAdmin)) {
+      return admitted;
+    }
 
-    // Deliver only this parsed replacement with a synchronous exit-policy
-    // scope. A refresh can reparse the same request in a separate callback.
+    // Deliver a reconciled list with a synchronous exit-policy scope, only
+    // while its request and source are current. A refresh can reparse the
+    // same request in a separate callback.
     final scoped = Completer<RouteMatchList>.sync();
     unawaited(
       Future<RouteMatchList>.value(admitted).then<void>((matches) {
+        final pending = identical(requested, _router._pendingReconciliation);
         final active =
-            identical(matches, restore.replacement) &&
             identical(information, _router.routeInformationProvider.value) &&
-            identical(restore, _router._pendingPublicRestore);
+            identical(current, _router.routerDelegate.currentConfiguration) &&
+            (requested == null || pending);
         if (!active) {
-          if (identical(information, _router.routeInformationProvider.value) &&
-              identical(restore, _router._pendingPublicRestore)) {
-            _router._pendingPublicRestore = null;
+          if (requested != null &&
+              pending &&
+              identical(information, _router.routeInformationProvider.value)) {
+            _router._pendingReconciliation = null;
           }
           scoped.complete(matches);
           return;
         }
-        _router._applyingPublicRestore = restore;
+        _router._applying = (
+          request: requested,
+          source: current,
+          delivered: matches,
+        );
         try {
           scoped.complete(matches);
         } finally {
-          _router._applyingPublicRestore = null;
+          _router._applying = null;
         }
       }, onError: scoped.completeError),
     );
