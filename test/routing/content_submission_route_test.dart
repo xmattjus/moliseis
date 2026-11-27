@@ -27,7 +27,9 @@ import 'package:moliseis/ui/sync/view_models/sync_view_model.dart';
 import 'package:moliseis/utils/result.dart';
 import 'package:moliseis/utils/result_command.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../support/admin_save_route_harness.dart';
 import '../support/command_test_support.dart';
 import '../support/content_submission_command_harness.dart';
 import '../support/fake_external_url_service.dart';
@@ -111,6 +113,225 @@ void main() {
       matching: find.byType(Checkbox),
     );
     await scrollToAndTap(tester, termsCheckbox);
+  }
+
+  for (final phase in ['dirty', 'submitting', 'finalizing']) {
+    testOwnerUI(
+      'Admin history retirement retains the public submission while $phase',
+      (tester) async {
+        final admin = AdminSaveRouteHarness();
+        ownerDisposals.add(admin.dispose);
+        final public = createHarness();
+        final owner = public.viewModel;
+        final router = admin.router;
+        await owner.initialize();
+        await tester.pumpWidget(
+          ChangeNotifierProvider<ContentSubmissionViewModel>.value(
+            value: owner,
+            child: admin.app(),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        unawaited(router.push<void>(RoutePaths.admin));
+        await tester.pumpAndSettle();
+        final navigator = router.routerDelegate.navigatorKey.currentState!;
+        final adminPage = navigator.widget.pages.last;
+        expect(adminPage.name, RouteNames.adminDashboard);
+
+        unawaited(router.push<void>(RoutePaths.contentSubmission));
+        await tester.pumpAndSettle();
+        final form = find.byType(ContentSubmissionScreen, skipOffstage: false);
+        final formElement = tester.element(form);
+        final formRoute = ModalRoute.of(formElement)!;
+        final formMatch = router.routerDelegate.currentConfiguration.last;
+        final formPage = navigator.widget.pages.last;
+        owner.setCity('Campobasso');
+        expect(await owner.checkpointDraft(), isA<Success<void>>());
+        owner.setCity('Isernia');
+        await tester.pump();
+
+        final clear = Completer<Result<void>>();
+        Route<dynamic>? progressRoute;
+        RouteMatchBase? progressMatch;
+        if (phase == 'submitting') {
+          owner
+            ..setName('Test Event')
+            ..setUserEmail('test@example.com')
+            ..setUserName('Test User')
+            ..setAcceptedTerms(value: true);
+          expect(owner.requestSubmit(), isTrue);
+          await pumpCommandTurns(tester);
+          expect(public.submissionRepository.submitCallCount, 1);
+          expect(owner.isSubmitting, isTrue);
+        } else if (phase == 'finalizing') {
+          public.draftRepository.pendingClearDraft = clear;
+          await fillValidForm(tester);
+          await scrollToAndTap(
+            tester,
+            find.widgetWithText(FilledButton, 'Invia'),
+          );
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(public.submissionRepository.submitCallCount, 1);
+          public.submissionRepository.completeSubmission(
+            const Result.success(null),
+          );
+          await pumpCommandTurns(tester);
+          expect(public.draftRepository.clearDraftCallCount, 1);
+          expect(owner.submissionFinalizationPending, isTrue);
+          progressRoute = ModalRoute.of(
+            tester.element(find.byType(ContentSubmissionProgressScreen)),
+          );
+          progressMatch = router.routerDelegate.currentConfiguration.last;
+        }
+
+        final state = owner.state;
+        final submission = owner.submitSnapshot;
+        final checkpointCalls = owner.checkpointCallCount;
+        final saveCalls = public.draftRepository.saveDraftCallCount;
+
+        admin.auth
+          ..setUser(phase == 'dirty' ? null : makeAuthUser(isAdmin: true))
+          ..emit(
+            phase == 'dirty'
+                ? AuthChangeEvent.signedOut
+                : AuthChangeEvent.signedIn,
+          );
+        await pumpCommandTurns(tester);
+        await tester.pump(const Duration(milliseconds: 400));
+
+        expect(find.text('Salvare le modifiche?'), findsNothing);
+        expect(navigator.widget.pages.map((page) => page.name).nonNulls, [
+          RouteNames.contentSubmission,
+          if (progressRoute != null) RouteNames.contentSubmissionUploadProgress,
+        ]);
+        expect(
+          navigator.widget.pages.any((page) => page.key == adminPage.key),
+          isFalse,
+        );
+        expect(tester.element(form), same(formElement));
+        expect(ModalRoute.of(formElement), same(formRoute));
+        expect((formRoute.settings as Page<dynamic>).key, formPage.key);
+        expect(
+          tester.widget<ContentSubmissionScreen>(form).viewModel,
+          same(owner),
+        );
+        expect(
+          router.routerDelegate.currentConfiguration.matches,
+          contains(same(formMatch)),
+        );
+        expect(owner.state, same(state));
+        expect(owner.submitSnapshot, same(submission));
+        expect(owner.checkpointCallCount, checkpointCalls);
+        expect(owner.restoreCallCount, 0);
+        expect(public.draftRepository.saveDraftCallCount, saveCalls);
+
+        if (progressRoute != null) {
+          expect(progressRoute.isCurrent, isTrue);
+          expect(
+            ModalRoute.of(
+              tester.element(find.byType(ContentSubmissionProgressScreen)),
+            ),
+            same(progressRoute),
+          );
+          expect(
+            router.routerDelegate.currentConfiguration.last,
+            same(progressMatch),
+          );
+          clear.complete(const Result.success(null));
+          await tester.pumpAndSettle();
+          expect(owner.submitSnapshot.completed, isTrue);
+        } else {
+          expect(formRoute.isCurrent, isTrue);
+          expect(await tester.binding.handlePopRoute(), isTrue);
+          await tester.pumpAndSettle();
+          if (phase == 'submitting') {
+            expect(find.text('Salvare le modifiche?'), findsNothing);
+            expect(formRoute.isCurrent, isTrue);
+            expect(public.submissionRepository.submittedClientSubmissionIds, [
+              state.clientSubmissionId,
+            ]);
+            public.submissionRepository.completeSubmission(
+              Result.error(Exception('synthetic failure')),
+            );
+            await tester.pumpAndSettle();
+          } else {
+            expect(find.text('Salvare le modifiche?'), findsOneWidget);
+            expect(owner.state.city, 'Isernia');
+            await tester.tap(find.text('Esci senza salvare'));
+            await tester.pumpAndSettle();
+            expect(owner.restoreCallCount, 1);
+            expect(owner.state.city, 'Campobasso');
+            expect(router.state.uri.path, RoutePaths.home);
+          }
+        }
+        expect(tester.takeException(), isNull);
+      },
+      disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals),
+    );
+  }
+
+  for (final (deciding, approve, refresh) in [
+    (true, false, false),
+    (true, true, false),
+    (false, false, false),
+    (false, false, true),
+  ]) {
+    testOwnerUI('Admin retirement preserves public navigation '
+        '(deciding: $deciding, approve: $approve, refresh: $refresh)', (
+      tester,
+    ) async {
+      final admin = AdminSaveRouteHarness();
+      ownerDisposals.add(admin.dispose);
+      final public = createHarness();
+      final router = admin.router;
+      await tester.pumpWidget(
+        ChangeNotifierProvider<ContentSubmissionViewModel>.value(
+          value: public.viewModel,
+          child: admin.app(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(router.push<void>(RoutePaths.admin));
+      await tester.pumpAndSettle();
+      unawaited(router.push<void>(RoutePaths.contentSubmission));
+      await tester.pumpAndSettle();
+      public.viewModel.setCity('Isernia');
+      final decision = find.text('Salvare le modifiche?');
+      Element? dialog;
+      if (deciding) {
+        router.go(RoutePaths.settings);
+        await tester.pumpAndSettle();
+        dialog = tester.element(decision);
+      }
+      if (refresh) admin.auth.viewModel.addListener(router.refresh);
+      admin.auth
+        ..setUser(null)
+        ..emit(AuthChangeEvent.signedOut);
+      if (!deciding) router.go(RoutePaths.settings);
+      await tester.pumpAndSettle();
+      final navigator = router.routerDelegate.navigatorKey.currentState!;
+      expect(
+        navigator.widget.pages.map((page) => page.name),
+        isNot(contains(RouteNames.adminDashboard)),
+      );
+      expect(decision, findsOneWidget);
+      if (dialog != null) expect(tester.element(decision), same(dialog));
+      expect(public.viewModel.checkpointCallCount, 0);
+      expect(public.viewModel.restoreCallCount, 0);
+      await tester.tap(find.text(approve ? 'Esci senza salvare' : 'Annulla'));
+      await tester.pumpAndSettle();
+      expect(
+        router.state.uri.path,
+        approve ? RoutePaths.settings : RoutePaths.contentSubmission,
+      );
+      expect(public.viewModel.restoreCallCount, approve ? 1 : 0);
+      expect(
+        navigator.widget.pages.map((page) => page.name),
+        isNot(contains(RouteNames.adminDashboard)),
+      );
+      expect(tester.takeException(), isNull);
+    }, disposeOwners: () => disposeContentSubmissionOwners(ownerDisposals));
   }
 
   for (final choice in ['Salva ed esci', 'Esci senza salvare']) {

@@ -65,6 +65,7 @@ GoRouter buildAppRouter({
   final adminExit = AdminSubmissionExitPolicy(adminAuthViewModel);
   late final AdminRouteHistoryRouter appRouter;
   Object? contentSubmissionTransitionOwner;
+  ValueKey<String>? pendingContentSubmissionExit;
 
   Object? acquireContentSubmissionTransition() {
     if (contentSubmissionTransitionOwner != null) return null;
@@ -83,6 +84,84 @@ GoRouter buildAppRouter({
     WidgetsBinding.instance.addPostFrameCallback((_) {
       releaseContentSubmissionTransition(token);
     });
+  }
+
+  Future<bool> exitContentSubmission(
+    BuildContext context,
+    GoRouterState state,
+  ) async {
+    final token = acquireContentSubmissionTransition();
+    if (token == null) return false;
+    pendingContentSubmissionExit = state.pageKey;
+    ContentSubmissionViewModel? owner;
+    String? identity;
+    var exiting = false;
+    bool current() {
+      if (!context.mounted) return false;
+      final captured = owner;
+      return captured != null &&
+          identical(context.read<ContentSubmissionViewModel?>(), captured) &&
+          captured.state.clientSubmissionId == identity;
+    }
+
+    try {
+      if (!context.mounted) return false;
+      final viewModel = context.read<ContentSubmissionViewModel>();
+      owner = viewModel;
+      identity = viewModel.state.clientSubmissionId;
+      if (viewModel.isSubmitting || viewModel.submissionFinalizationPending) {
+        return false;
+      }
+      if (!viewModel.hasUnsavedChanges) {
+        releaseAfterRouteRemoval(token);
+        exiting = true;
+        return true;
+      }
+      final choice = await showDialog<UnsavedChangesDecision>(
+        context: context,
+        builder: (_) => const UnsavedChangesDialog(),
+      );
+      if (!context.mounted) return false;
+      if (!current() ||
+          viewModel.isSubmitting ||
+          viewModel.submissionFinalizationPending) {
+        return false;
+      }
+      final result = switch (choice) {
+        UnsavedChangesDecision.saveAndExit => await viewModel.checkpointDraft(),
+        UnsavedChangesDecision.discardAndExit =>
+          await viewModel.restoreCheckpointDraft(),
+        UnsavedChangesDecision.cancel || null => null,
+      };
+      if (!context.mounted) return false;
+      if (!current() ||
+          viewModel.isSubmitting ||
+          viewModel.submissionFinalizationPending) {
+        return false;
+      }
+      if (result == null) return false;
+      if (result is Error<void>) {
+        showSnackBarGenericError(context: context);
+        return false;
+      }
+      releaseAfterRouteRemoval(token);
+      exiting = true;
+      return true;
+    } on Object catch (error, stack) {
+      if (error is AssertionError) rethrow;
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: error,
+          stack: stack,
+          context: ErrorDescription('leaving a content submission form'),
+        ),
+      );
+      if (current()) showSnackBarGenericError(context: context);
+      return false;
+    } finally {
+      pendingContentSubmissionExit = null;
+      if (!exiting) releaseContentSubmissionTransition(token);
+    }
   }
 
   final routing = RoutingConfig(
@@ -119,83 +198,9 @@ GoRouter buildAppRouter({
       GoRoute(
         path: RoutePaths.contentSubmission,
         name: RouteNames.contentSubmission,
-        onExit: (context, _) async {
-          final token = acquireContentSubmissionTransition();
-          if (token == null) return false;
-          ContentSubmissionViewModel? owner;
-          String? identity;
-          var exiting = false;
-          bool current() {
-            if (!context.mounted) return false;
-            final captured = owner;
-            return captured != null &&
-                identical(
-                  context.read<ContentSubmissionViewModel?>(),
-                  captured,
-                ) &&
-                captured.state.clientSubmissionId == identity;
-          }
-
-          try {
-            if (!context.mounted) return false;
-            final viewModel = context.read<ContentSubmissionViewModel>();
-            owner = viewModel;
-            identity = viewModel.state.clientSubmissionId;
-            if (viewModel.isSubmitting ||
-                viewModel.submissionFinalizationPending) {
-              return false;
-            }
-            if (!viewModel.hasUnsavedChanges) {
-              releaseAfterRouteRemoval(token);
-              exiting = true;
-              return true;
-            }
-            final choice = await showDialog<UnsavedChangesDecision>(
-              context: context,
-              builder: (_) => const UnsavedChangesDialog(),
-            );
-            if (!context.mounted) return false;
-            if (!current() ||
-                viewModel.isSubmitting ||
-                viewModel.submissionFinalizationPending) {
-              return false;
-            }
-            final result = switch (choice) {
-              UnsavedChangesDecision.saveAndExit =>
-                await viewModel.checkpointDraft(),
-              UnsavedChangesDecision.discardAndExit =>
-                await viewModel.restoreCheckpointDraft(),
-              UnsavedChangesDecision.cancel || null => null,
-            };
-            if (!context.mounted) return false;
-            if (!current() ||
-                viewModel.isSubmitting ||
-                viewModel.submissionFinalizationPending) {
-              return false;
-            }
-            if (result == null) return false;
-            if (result is Error<void>) {
-              showSnackBarGenericError(context: context);
-              return false;
-            }
-            releaseAfterRouteRemoval(token);
-            exiting = true;
-            return true;
-          } on Object catch (error, stack) {
-            if (error is AssertionError) rethrow;
-            FlutterError.reportError(
-              FlutterErrorDetails(
-                exception: error,
-                stack: stack,
-                context: ErrorDescription('leaving a content submission form'),
-              ),
-            );
-            if (current()) showSnackBarGenericError(context: context);
-            return false;
-          } finally {
-            if (!exiting) releaseContentSubmissionTransition(token);
-          }
-        },
+        onExit: (context, state) => appRouter.retainsContentSubmission(state)
+            ? true
+            : exitContentSubmission(context, state),
         builder: (context, _) {
           final viewModel = context
               .select<ContentSubmissionViewModel, ContentSubmissionViewModel>(
@@ -607,6 +612,7 @@ GoRouter buildAppRouter({
     observers: [if (kDebugMode) TalkerRouteObserver($talker!)],
     auth: adminAuthViewModel,
     onAuthorityRetired: adminExit.retireAuthority,
+    pendingContentSubmissionExit: () => pendingContentSubmissionExit,
     navigatorKey: _rootNavigatorKey,
     refreshListenable: Listenable.merge([
       syncViewModel.sync.results,
