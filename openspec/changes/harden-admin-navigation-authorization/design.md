@@ -130,6 +130,34 @@ correction proven redundant. Dashboard ownership and authorization are
 independent acceptance conditions. Deferred ordinary exits stay out of
 scope.
 
+### Observed dependency checkpoint
+
+The dependency-only commit `d715bcb` resolves pub.dev stable 18.1.4. Only
+GoRouter changed in the lockfile, resolved package graph and package
+configuration. Flutter 3.47.5, Dart 3.13.4 and both UI packages stayed
+at their baseline versions. The four core files remained byte-identical
+and the builder differed.
+
+The same affected suites passed on both releases with 1,633 successes
+including all 38 original characterizations, and one ordinary NAV-01
+skip. The opt-in probes assert the original defects as well as controls.
+
+| Finding | Classification | Observed on both versions |
+| --- | --- | --- |
+| F1 | Unchanged | The uninstalled-cover order left A's Dashboard Route active under Login. System Back restored the original Dashboard and its loaded data. Ordinary loss and the installed-cover diagnostic control left Login at the root. |
+| F2 | Unchanged | A stale Dashboard action reserved reactivation and dispatched the captured source ID. Fake success started both follow-up reads and published the pending ID on the retained owner. |
+| F3 | Unchanged | A-to-B retained the original Dashboard and owner without a fresh read. An outstanding A read could publish to the retained owner. |
+| F4 | Unchanged | Back resurfaced the same malformed diagnostic and retained Editor and Progress history in the cover cases. Existing Editor guards rejected the tested stale private actions. |
+
+NAV-01 returned `true` for Map-root Back on 18.0.2, with the inactive
+Post stack and State preserved. On 18.1.4 the original assertions all
+held. The scratch run needed the existing explicit owner teardown helper
+for deferred command timers. The upstream builder qualifies its wrapper
+`PopScope` with active-branch state. The permanent test uses the same
+assertions and that teardown helper. Physical-device predictive Back and
+cancellation remain open. The Admin history and ownership fixes remain
+required independently of NAV-01.
+
 ## Decisions
 
 ### Put continuity in the existing auth owner
@@ -252,6 +280,68 @@ Prove B cannot see or claim A's draft and returning A must enter through a
 fresh visit to recover durable draft and staged assets. The narrow pending
 activation correction addresses the source gap. Existing editor command
 and persistence architecture remains the basis.
+
+## Implemented decisions
+
+`AdminAuthViewModel` publishes an opaque, account-qualified interval before
+notifying dependents. The GoTrue event snapshot can retire an interval even
+when the live session has advanced. Grants require a matching live user
+observation or a correlated successful SDK login. Stream failure retires the
+interval. Same-account profile updates and refresh preserve it.
+
+The Admin-specific GoRouter integration replaces route information using the
+clean prefix from `RouteMatchList.remove`, a qualified provider push, or a
+bounded declarative landing. It may restore the original eligible public
+cover over a clean prefix. Its parser checks saved and pending bases before
+installing their matches. Committed Admin configuration must carry that
+parse's authority because the delegate can finish an already-approved exit
+after Flutter discards its old parser transaction. A late obsolete commit
+cannot admit private builders and triggers another bounded reconciliation.
+The declarative Dashboard Page rotates with authority. Existing imperative
+Pages retain their unique GoRouter keys. The exit policy releases old
+reservations and removes its exact dialog; Progress bypasses its exit veto
+when the committed configuration retires. Unrelated public auth events
+leave navigation untouched.
+
+A Dashboard owner binds before its first read, drops protected state on
+revocation, rejects later execution boundaries, and lets physical work
+settle privately. The protected Scaffold subtree owns its feedback messenger
+so revocation removes even queued private feedback. Public app feedback can
+use its own messenger concurrently. Recovery retains the existing
+suspension, ownership and revalidation rules. The Editor captures route
+authority before activation, with the existing draft session checking the
+captured authority at lookup and installation boundaries. Revocation clears
+runtime state and preserves the account-qualified durable checkpoint and
+assets.
+
+The Settings and Gallery reconciliation tests now trigger an explicit
+router refresh to preserve their stale Page and completer assertions.
+Unrelated public Auth events no longer induce that reparse. The existing
+replacement exit test waits for the new observed authority before making
+its fresh Editor request and keeps its original reservation assertions.
+
+## Autonomous verification
+
+- The affected Flutter suites passed 2,577 tests. The complete suite passed
+  4,519 tests with five existing skips and zero failures. The isolated
+  checkout used the repository's existing ObjectBox native library and Rome
+  timezone. Static analysis and formatting checks passed.
+- The autonomous Deno suite passed 246 tests, including the Admin function
+  and shared tooling. Strict OpenSpec validation passed for this change.
+  Strict canonical-only validation reported the same 17 existing warning
+  failures as the investigation baseline, with identical findings.
+- A1 covers real queued GoTrue observations and refresh/error controls.
+  H1–H4 assert installed Pages and Routes, pending commits, public ancestry,
+  encoded restoration, Progress and dirty exits. D1–D3 cover retired UI,
+  semantics, feedback, reservation, dispatch and private settlement. E1–E2
+  cover pending draft isolation and existing durable recovery and Save paths.
+- Temporary negative controls failed as expected when event payload evidence
+  was discarded, Dashboard entry guards were removed, a pending Editor
+  lookup was allowed to install under revoked authority, or a late route
+  commit received the replacement account's authority. The variants ran
+  outside the permanent diff.
+- The [disposable runtime results](test-plan.md#observed-local-runtime-results)
+  include actual gateway effects and the shared SDK request boundary.
 
 ## Risks and verification boundaries
 

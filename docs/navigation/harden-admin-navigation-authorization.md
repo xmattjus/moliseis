@@ -1,6 +1,6 @@
 # Harden Admin navigation authorization
 
-**Status — planning ready for review. Public release blocked.** The project
+**Status — implementation prepared for independent review. Public release blocked.** The project
 owner retains the release decision. Follow the
 [OpenSpec change](../../openspec/changes/harden-admin-navigation-authorization/proposal.md).
 This work is independent of [deferred route exits](harden-deferred-route-exits.md).
@@ -16,10 +16,22 @@ The tested Editor paths rejected stale privileged operations and did
 not disclose private drafts. The probes established client defects and
 produced no unauthorized remote mutation.
 
+The dependency checkpoint reproduced all four Admin findings on GoRouter
+18.1.4. The implementation binds protected routes, presentation and work to
+continuous observed authority and removes obsolete Admin history. NAV-01 is
+enabled with its original Map-root Back and inactive Post retention assertions.
+The upstream branch-activity correction passed the widget test. Physical
+system and predictive Back remain part of device verification.
+
+The disposable Supabase run confirmed current server-role enforcement and
+observed zero additional endpoint requests from a retired Dashboard
+callback. A request that had already passed server authorization could
+still complete after demotion. The local results do not establish
+production deployment behavior.
+[Verification record](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md).
+
 ## Open release gates
 
-- Verify authorization remediation together with the stable GoRouter
-  upgrade and the [autonomous and local runtime checks](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md).
 - Record owner-observed
   [physical Android and iOS results](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md#owner-executed-physical-device-release-gates).
 - Resolve or explicitly record remaining runtime limits and obtain the

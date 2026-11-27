@@ -104,6 +104,28 @@ material backend authorization defect requires separate remediation
 authorization and keeps the release blocked. Use no production accounts,
 roles, submissions or deployment changes.
 
+### Observed local runtime results
+
+The disposable stack ran the repository migrations and real Admin function
+through Supabase CLI 2.122.0, Docker 29.7.2, GoTrue 2.197.0, Kong 2.8.1,
+Edge Runtime 1.77.8, and Postgres 17.11.0.006. Anonymous sign-in was enabled
+in the isolated runtime configuration to establish that control. Both
+stack instances were stopped and their disposable data removed.
+
+| Case | Effective result |
+| --- | --- |
+| Authorized baseline and source reactivation | A and B each received HTTP 200 for list. An authorized synthetic `unIgnoreSource` returned 200 and direct SQL confirmed `ignored_at` cleared. |
+| After sign-out with the previous unexpired token | Sign-out returned 204. Subsequent Auth user lookup returned 403 and the function returned 401 `UNAUTHORIZED` on the same token. |
+| After server-side Admin demotion with the previous token | Auth user lookup returned 200 with current `admin=false`. The function returned 403 `ADMIN_REQUIRED`. Non-Admin and anonymous controls also returned 403; missing credentials returned 401. |
+| A-to-B account switch | While A remained an Admin, A's previous credential and B's credential independently returned 200. In the separate shared-SDK run, an observing transport verified one actual list request from A and one from the fresh B owner, both 200. The captured A callback added zero endpoint requests after B was observed. |
+| Already-authorized operation | A database row lock held the real request inside `set_source_ignored` after authorization. A's Admin metadata was revoked, then the lock transaction completed. The in-flight operation returned 200 and cleared `ignored_at`. A later request with the same token returned 403. |
+
+The shared-SDK run observed callback rejection at the actual endpoint.
+Controlled Flutter tests exercise zero repository entry after reservation
+and suppression of late publication and follow-up work. These local checks
+establish no deployment-specific behavior. The public release decision and
+physical-device gates remain open.
+
 ## Owner-executed physical-device release gates
 
 **Status: OPEN.** Use a release-candidate build and synthetic accounts and

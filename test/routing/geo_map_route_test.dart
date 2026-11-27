@@ -109,55 +109,44 @@ void main() {
     (WindowSizeClass.expanded, Size(1000, 900)),
     (WindowSizeClass.large, Size(1300, 900)),
   ];
-  testWidgets(
-    'NAV-01 [upstream #188018] inactive Post branch must not consume '
-    'Map root Back',
-    (tester) async {
-      final event = makeEvent();
-      final harness = _MapHarness();
-      final router = _buildTestRouterApp(
-        harness,
-        eventRepository: FakeEventRepository(
-          getByIdResults: <int, Result<Event>>{1: Result.success(event)},
-        ),
-      );
-      addTearDown(router.router.dispose);
+  testOwnerUI('NAV-01 [upstream #188018] inactive Post branch must not consume '
+      'Map root Back', (tester) async {
+    final event = makeEvent();
+    final harness = _MapHarness();
+    final router = _buildTestRouterApp(
+      harness,
+      eventRepository: FakeEventRepository(
+        getByIdResults: <int, Result<Event>>{1: Result.success(event)},
+      ),
+    );
+    addTearDown(router.router.dispose);
 
-      await tester.pumpWidget(router.app);
-      router.router.go('/home/posts/1?type=event');
-      await tester.pumpAndSettle();
-      final postFinder = find.byType(PostScreen, skipOffstage: false);
-      final postState = tester.state(postFinder);
-      final postNavigator = Navigator.of(tester.element(postFinder));
-      expect(postNavigator.widget.pages.length, 2);
+    await tester.pumpWidget(router.app);
+    router.router.go('/home/posts/1?type=event');
+    await tester.pumpAndSettle();
+    final postFinder = find.byType(PostScreen, skipOffstage: false);
+    final postState = tester.state(postFinder);
+    final postNavigator = Navigator.of(tester.element(postFinder));
+    expect(postNavigator.widget.pages.length, 2);
 
-      router.router.go(RoutePaths.geoMap);
-      await tester.pumpAndSettle();
-      final mapContext = tester.element(find.byType(GeoMapScreen));
-      expect(StatefulNavigationShell.of(mapContext).currentIndex, 3);
-      expect(Navigator.of(mapContext).widget.pages.length, 1);
-      expect(postState.mounted, isTrue);
-      expect(tester.state(postFinder), same(postState));
+    router.router.go(RoutePaths.geoMap);
+    await tester.pumpAndSettle();
+    final mapContext = tester.element(find.byType(GeoMapScreen));
+    expect(StatefulNavigationShell.of(mapContext).currentIndex, 3);
+    expect(Navigator.of(mapContext).widget.pages.length, 1);
+    expect(postState.mounted, isTrue);
+    expect(tester.state(postFinder), same(postState));
 
-      // A root branch has no previous page: the Back event must bubble out.
-      expect(await tester.binding.handlePopRoute(), isFalse);
-      await tester.pumpAndSettle();
-      expect(
-        router.router.routeInformationProvider.value.uri.path,
-        RoutePaths.geoMap,
-      );
-      expect(postNavigator.widget.pages.length, 2);
-      expect(tester.state(postFinder), same(postState));
-    },
-    // Reproduced on go_router 18.0.2: Map-root Back returns true while the
-    // inactive Post keeps its two pages, mounted State and State identity.
-    // https://github.com/flutter/flutter/issues/188018
-    // https://github.com/flutter/packages/pull/11910
-    // Both remain open as checked on 2026-10-07. Unskip after a released fix
-    // makes handlePopRoute false
-    // while preserving the inactive Post State and stack.
-    skip: true,
-  );
+    // A root branch has no previous page: the Back event must bubble out.
+    expect(await tester.binding.handlePopRoute(), isFalse);
+    await tester.pumpAndSettle();
+    expect(
+      router.router.routeInformationProvider.value.uri.path,
+      RoutePaths.geoMap,
+    );
+    expect(postNavigator.widget.pages.length, 2);
+    expect(tester.state(postFinder), same(postState));
+  });
 
   for (final (windowClass, size) in responsiveViewports) {
     final usesBottomNavigation =
