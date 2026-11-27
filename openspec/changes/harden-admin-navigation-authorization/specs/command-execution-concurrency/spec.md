@@ -43,10 +43,18 @@ After observed Admin authority loss or replacement, obsolete Admin history SHALL
 - **AND** running or fatal sync retains precedence, validated public return targets retain existing behavior, and stale Admin return targets resolve to the authorized landing without restoring their history or arguments
 
 #### Scenario: The public Content Submission route survives retirement
-- **GIVEN** the public form covers obsolete Admin history, with or without its active Progress page
-- **WHEN** Admin reconciliation retains those pages
-- **THEN** the original form and applicable Progress pages retain their route, draft, operation and transition ownership without a new exit decision, checkpoint or discard
+- **GIVEN** the public form, with or without its Progress page, sits above obsolete Admin history, beneath or above other public routes, or beneath a protected cover
+- **WHEN** Admin reconciliation removes the obsolete Admin pages
+- **THEN** every committed public route above the clean prefix keeps its order, route, Page and push completion, and the form and applicable Progress pages retain their draft, operation and transition ownership without a new exit decision, checkpoint or discard
+- **AND** a protected cover is replaced by Login or a fresh Dashboard above those public routes
+- **AND** a Progress push the form already requested but that has not committed is installed above the form and completes the original push Future
 - **AND** a pending or later navigation that genuinely removes the form remains subject to its existing exit protections
+
+#### Scenario: Saved history redirects an obsolete Admin base
+- **GIVEN** saved route state with a declarative Admin base and a public imperative cover
+- **WHEN** it is restored without Admin authority and GoRouter redirects that base to Login before the application validates the decoded history
+- **THEN** the safe Login result is accepted even though the saved public cover is not restored
+- **AND** no obsolete protected content is restored, and live committed public history remains subject to the preservation rules above
 
 #### Scenario: Navigation is restored or a decision is pending
 - **WHEN** saved route state or an obsolete async navigation or exit decision would otherwise reinstall or preserve an Admin visit from ended authority

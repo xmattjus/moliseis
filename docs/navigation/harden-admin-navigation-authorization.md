@@ -23,6 +23,12 @@ enabled with its original Map-root Back and inactive Post retention assertions.
 The upstream branch-activity correction passed the widget test. Physical
 system and predictive Back remain part of device verification.
 
+Reconciliation keeps committed public history above the clean prefix in
+its original order, including a public form beneath a protected cover.
+A Progress push requested but not yet committed is kept as well. A
+signed-out restoration of a saved Admin base with a public cover may
+safely restore Login alone; this is an accepted limitation.
+
 The disposable Supabase run confirmed current server-role enforcement and
 observed zero additional endpoint requests from a retired Dashboard
 callback. A request that had already passed server authorization could

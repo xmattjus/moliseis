@@ -80,6 +80,11 @@ paths only where existing coverage does not assert the changed boundary.
 | R2 | Refresh errors could appear concurrently with unrelated app feedback or before an already-visible app message. | Exercise visible and queued Dashboard retirement with unrelated feedback before or after it. Check same-turn native dismissal, recovery revalidation after the surviving tail, and global clearing with a queued owned entry. Retain the existing Dashboard authority and DRAFT-11/DRAFT-12 regressions. |
 | R3 | Loss, anonymous sign-in and renewed Admin authority can commit without an intervening Navigator build. A stale restoration can also supersede the fresh landing request. | Exercise same-account and different-account admission at the root and above Home, plus the superseding restore. Require a rendered fresh owner, a fresh read, retirement of private state and work, and valid Back history. |
 | R4 | Sign-out on wholly public history should leave the router idle. | Verify Gallery configuration, route information, Page and Back history remain intact. Verify a dirty public submission keeps its state and the usual Back decision. |
+| R5 | A protected cover above the form removed the form or stalled on its exit guard, leaving obsolete Dashboards. Settings between Admin and the form was lost. Retirement could supersede a requested but uncommitted Progress push. | Cover clean, dirty, submitting and finalizing forms, with sign-out and replacement. Assert installed Pages, form Route, Page key and match identity, retired keys, no dialog, unchanged draft calls, Back and later genuine exit consent. Keep Settings Page, order and both push futures. Request Progress before and after commit through the real submit flow, then exercise success, remote failure and finalization retry with one dispatch. Also cover a stale-base public push during retirement, the original push Future and newer superseding navigation. |
+
+Signed-out restoration of a declarative Admin base with a public cover
+may restore Login alone. This accepted limitation concerns saved state
+only. Live committed public history must be preserved.
 
 For a GoRouter upgrade, run `admin_authorization_history_test.dart`
 for Page replacement, public ancestry, pending commits and restoration,

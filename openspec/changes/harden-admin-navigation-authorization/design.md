@@ -291,8 +291,8 @@ interval. Same-account profile updates and refresh preserve it.
 
 The Admin-specific GoRouter integration replaces route information using the
 clean prefix from `RouteMatchList.remove`, a qualified provider push, or a
-bounded declarative landing. It may restore the original eligible public
-cover over a clean prefix. Its parser checks saved and pending bases before
+bounded declarative landing. It preserves committed public history over a
+clean prefix, as described below. Its parser checks saved and pending bases before
 installing their matches. Committed Admin configuration must carry that
 parse's authority because the delegate can finish an already-approved exit
 after Flutter discards its old parser transaction. A late obsolete commit
@@ -321,7 +321,7 @@ reverse-order exit walk can inspect the scoped restore during that
 completion. An asynchronous public decision keeps its existing exit
 ownership after the scope ends.
 The public exit policy accepts that callback only when the current
-retiring source and the approved replacement contain the identical
+retiring source and the delivered reconciled list contain the identical
 imperative match for its Page key. The original form and any current
 Progress Page retain their route and operation ownership. A genuine
 public exit still owns its existing decision. If a public go has arrived
@@ -377,6 +377,44 @@ its fresh Editor request and keeps its original reservation assertions.
 - The [disposable runtime results](test-plan.md#observed-local-runtime-results)
   include actual gateway effects and the shared SDK request boundary.
 
+### Committed public history preservation
+
+Reconciliation previously removed the protected suffix and rebuilt only
+public forms and the top cover. A protected cover above a form made the
+replacement remove the form, so its exit guard could prompt or silently
+refuse, leaving both obsolete Dashboards installed. Settings between
+Admin and the form was lost. One policy now replaces those branches and
+the restoration path's single-cover reattachment. It keeps the clean
+prefix from `RouteMatchList.remove`, or Home when none survives. It then
+pushes every later public `ImperativeRouteMatch` back in tree order with
+`RouteMatchList.push`, using the original objects. Page keys, push
+completers, shell insertion, metadata and URIs therefore stay with
+GoRouter. Protected and Sync matches are not retained. Sync is
+re-requested with its sanitized return. A protected or Sync top gets
+its destination pushed on that base in the same request. Shell-nested
+imperative matches may move into GoRouter's own branch Navigator when
+reattached; no current Admin route pushes such a match.
+
+The exit qualification is scoped to the synchronous delivery of a
+reconciled list, either the requested restore or push or a stale-base
+parse validated during retirement. A form's `onExit` is accepted only
+when that exact match is in the delivered list. Any other navigation,
+including a replayed public go, uses the ordinary exit policy.
+
+If the retained public top already requested a public push from the
+committed configuration, for example Progress after submission, the
+reconciliation reissues it on the safe base. The new match's result
+completes the caller's original completer. GoRouter exposes no supported
+way to keep the original completer in a new request. Payload, operation
+and supersession stay with the existing request flow, and obsolete
+protected requests are not replayed.
+
+GoRouter decodes and redirects saved state before the application parser
+receives the match list. A signed-out restoration of a declarative Admin
+base with a public cover can therefore resolve to Login alone. The safe
+Login fallback is accepted for this release. Avoiding it would need a
+private restoration codec or parallel saved history.
+
 ### Independent review remediation
 
 The affected Flutter suites passed 1,923 tests. The complete Flutter suite
@@ -392,6 +430,25 @@ routing failures. Removing same-turn dismissal protection or queue reset
 invalidation allowed a stale retirement to remove the next Snackbar.
 The backend and dependency inputs are unchanged from the verified
 implementation. The local runtime evidence and open release gates still apply.
+
+### Committed history remediation verification
+
+Characterization on the reviewed router reproduced the protected-cover
+and intermediate Settings losses and the lost uncommitted Progress push.
+The committed Progress control passed. The complete Flutter suite passed
+4,551 tests with five existing skips, including NAV-01 with its original
+assertions. Flutter analysis, formatting of changed files and strict
+validation of this change passed. Temporary negative controls ran
+outside the permanent diff. The reviewed router failed every new
+covered-form, Settings, pending Progress and Future case. Removing only
+the pending-push reissue failed the four pending cases. Removing the
+stale-base parse scope reopened the dirty-exit dialog. Removing
+feedback retirement from the visit reset failed both mounted-Dashboard
+feedback variants, which the previous test did not detect. Dropping the
+delivered-list check from the exit qualification was not detected. It
+matters only when a running Sync redirects the reconciliation request in
+the same turn. The backend and dependency inputs are unchanged, so the
+earlier disposable runtime evidence still applies.
 
 ## Risks and verification boundaries
 
