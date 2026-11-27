@@ -1,36 +1,26 @@
-# Investigate and harden Admin navigation authorization
+# Harden Admin navigation authorization
 
-**Status — investigation required before the next public release.** The
-project owner retains the release decision after investigation and severity
-assessment. This work can proceed independently of
-[deferred route exits](harden-deferred-route-exits.md).
+**Status — planning ready for review. Public release blocked.** The project
+owner retains the release decision. Follow the
+[OpenSpec change](../../openspec/changes/harden-admin-navigation-authorization/proposal.md).
+This work is independent of [deferred route exits](harden-deferred-route-exits.md).
 
-## Demonstrated behavior
+The investigation at `8c0e61ea42d98641bbb57d829627171bd1a3d279` reproduced
+a pending imperative cover that installed Login above revoked Admin
+history. Back restored a populated Dashboard with submission and
+ignored-source data and could also restore malformed, Editor and Save
+Progress routes. Stale Dashboard controls reached a synthetic repository
+after revocation. A direct switch to another administrator retained the
+old Dashboard and allowed prior intent and results to cross accounts.
+The tested Editor paths rejected stale privileged operations and did
+not disclose private drafts. The probes established client defects and
+produced no unauthorized remote mutation.
 
-1. With Admin authority, push the malformed submission diagnostic and let it
-   settle. Push an Admin Dashboard cover and drain microtasks without a
-   frame. The cover has committed while the diagnostic is still the
-   Navigator's installed top Route.
-2. Revoke Admin authority. The auth refresh can reinterpret the outstanding
-   push, redirect its destination to Login and retain the existing Admin
-   entries beneath Login.
-3. Reconcile the screen and send system Back. The diagnostic can become
-   visible again while `isAdmin` is false.
+## Open release gates
 
-The investigation reproduced this sequence both at the pre-remediation
-baseline (`e15233f`) and with the deferred-exit workaround (`38ddca5`). The
-ordering matters. After the cover is installed, the auth refresh can replace
-the stack with Login.
-
-Private-data exposure and backend authorization bypass were not demonstrated.
-The diagnostic's visibility establishes a presentation and history issue.
-Evaluate client-side presentation and action admission independently of
-server-side data and action authorization.
-
-## Investigation scope
-
-Determine whether retained history can expose Admin Dashboard data, editor
-state or private drafts, previous-account data, or protected feature actions.
-Cover sign-out, role revocation and account replacement. Verify both the
-visible history and applicable server enforcement before assigning severity
-or proposing a correction.
+- Verify authorization remediation together with the stable GoRouter
+  upgrade and the [autonomous and local runtime checks](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md).
+- Record owner-observed
+  [physical Android and iOS results](../../openspec/changes/harden-admin-navigation-authorization/test-plan.md#owner-executed-physical-device-release-gates).
+- Resolve or explicitly record remaining runtime limits and obtain the
+  project owner's release decision.
